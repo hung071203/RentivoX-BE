@@ -1,13 +1,11 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, JoinColumn, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../src/base/base.entity';
 import { DocumentType } from '../../src/common/enums';
 import { Contract } from './contract.entity';
 import { User } from './user.entity';
 
 @Entity('contract_documents')
-export class ContractDocument {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class ContractDocument extends BaseEntity {
   @Column({ name: 'contract_id' })
   contractId: string;
 
@@ -30,10 +28,4 @@ export class ContractDocument {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'uploaded_by' })
   uploadedBy: User;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }

@@ -1,11 +1,9 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../src/base/base.entity';
 import { Contract } from './contract.entity';
 
 @Entity('room_occupants')
-export class RoomOccupant {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class RoomOccupant extends BaseEntity {
   @Column({ name: 'contract_id' })
   contractId: string;
 
@@ -27,7 +25,4 @@ export class RoomOccupant {
 
   @Column({ name: 'moved_out_date', type: 'date', nullable: true })
   movedOutDate: Date;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
 }

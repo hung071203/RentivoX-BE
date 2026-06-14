@@ -13,12 +13,10 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "ignoreDeprecations": "6.0",
-    "baseUrl": "./",
     "paths": {
-      "@lib/*": ["lib/src/*"],
-      "@entities/*": ["lib/database/entities/*"],
-      "@repositories/*": ["lib/database/repositories/*"]
+      "@lib/*": ["./lib/src/*"],
+      "@entities/*": ["./lib/database/entities/*"],
+      "@repositories/*": ["./lib/database/repositories/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

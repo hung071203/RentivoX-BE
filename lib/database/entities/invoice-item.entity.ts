@@ -1,12 +1,10 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../src/base/base.entity';
 import { Invoice } from './invoice.entity';
 import { ContractService } from './contract-service.entity';
 
 @Entity('invoice_items')
-export class InvoiceItem {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class InvoiceItem extends BaseEntity {
   @Column({ name: 'invoice_id' })
   invoiceId: string;
 
@@ -32,7 +30,4 @@ export class InvoiceItem {
 
   @Column({ type: 'bigint' })
   amount: number;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
 }

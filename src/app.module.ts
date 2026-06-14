@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { env } from '../lib/src/configs/env.config';
+import { AuthModule } from './apis/auth/auth.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { env } from '../lib/src/configs/env.config';
       synchronize: env.nodeEnv === 'development',
       logging: env.nodeEnv === 'development',
     }),
+    AuthModule,
   ],
 })
 export class AppModule {}
