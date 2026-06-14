@@ -37,13 +37,4 @@ export class AuthService {
       },
     };
   }
-
-  async getProfile(userId: string) {
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, createdAt: true },
-    });
-    if (!user) throw new UnauthorizedException();
-    return user;
-  }
 }
