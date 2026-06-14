@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import * as Joi from 'joi';
 
 const schema = Joi.object({
@@ -12,6 +13,9 @@ const schema = Joi.object({
   DB_PASSWORD: Joi.string().required(),
   DB_NAME: Joi.string().required(),
 
+  ADMIN_EMAIL: Joi.string().email().required(),
+  ADMIN_PASSWORD: Joi.string().min(6).required(),
+
   JWT_SECRET: Joi.string().required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
 }).unknown(true);
@@ -21,7 +25,7 @@ if (error) {
   throw new Error(`Environment validation failed: ${error.message}`);
 }
 
-export const env = {
+export const ENV = {
   nodeEnv: value.NODE_ENV as string,
   port: value.PORT as number,
   db: {
@@ -34,5 +38,9 @@ export const env = {
   jwt: {
     secret: value.JWT_SECRET as string,
     expiresIn: value.JWT_EXPIRES_IN as string,
+  },
+  admin: {
+    email: value.ADMIN_EMAIL as string,
+    password: value.ADMIN_PASSWORD as string,
   },
 };
