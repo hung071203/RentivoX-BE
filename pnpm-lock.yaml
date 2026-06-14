@@ -38,6 +38,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      dayjs:
+        specifier: ^1.11.21
+        version: 1.11.21
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2

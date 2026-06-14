@@ -7,7 +7,6 @@ import isBetween from 'dayjs/plugin/isBetween';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import isSameOfAfter from 'dayjs/plugin/isSameOrAfter';
 import minMax from 'dayjs/plugin/minMax';
-import { DEFAULT_TIMEZONE } from '../common';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -17,7 +16,7 @@ dayjs.extend(isBetween);
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOfAfter);
 dayjs.extend(minMax);
-dayjs.tz.setDefault(DEFAULT_TIMEZONE);
+dayjs.tz.setDefault('Asia/Ho_Chi_Minh');
 export type Dayjs = dayjs.Dayjs;
 
 export { dayjs };

@@ -1,4 +1,4 @@
-import { DateFormatEnum } from '../common';
+import { DateFormatEnum } from "@lib/common/constants/app.constant";
 import { dayjs } from './dayjs.util';
 
 export class DateUtils {
