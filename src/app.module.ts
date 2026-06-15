@@ -8,7 +8,7 @@ import { AuthModule } from './apis/auth/auth.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
-      type: 'postgres',
+      type: 'mysql',
       host: env.db.host,
       port: env.db.port,
       username: env.db.username,
