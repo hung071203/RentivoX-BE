@@ -4,7 +4,7 @@ import { seeders } from './index';
 import { ENV } from '@lib/configs/env.config';
 
 const AppDataSource = new DataSource({
-  type: 'postgres',
+  type: 'mysql',
   host: ENV.db.host,
   port: ENV.db.port,
   username: ENV.db.username,
