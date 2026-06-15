@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ENV } from '../lib/src/configs/env.config';
 import { AuthModule } from './apis/auth/auth.module';
+import { AdminModule } from './apis/admin/admin.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthModule } from './apis/auth/auth.module';
       logging: ENV.nodeEnv === 'development',
     }),
     AuthModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

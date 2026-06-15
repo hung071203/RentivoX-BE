@@ -2,8 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
 import { User } from '../../../lib/database/entities/user.entity';
+import { AuthUtil } from '../../../lib/src/utils/auth.util';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
@@ -21,7 +21,7 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
 
-    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    const isMatch = await AuthUtil.comparePassword(dto.password, user.passwordHash);
     if (!isMatch) throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
 
     const payload = { sub: user.id, email: user.email, role: user.role };
