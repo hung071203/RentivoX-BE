@@ -16,6 +16,8 @@ const schema = Joi.object({
   ADMIN_EMAIL: Joi.string().email().required(),
   ADMIN_PASSWORD: Joi.string().min(6).required(),
 
+  CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
+
   JWT_SECRET: Joi.string().required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
 }).unknown(true);
@@ -35,6 +37,7 @@ export const ENV = {
     password: value.DB_PASSWORD as string,
     name: value.DB_NAME as string,
   },
+  corsOrigin: value.CORS_ORIGIN as string,
   jwt: {
     secret: value.JWT_SECRET as string,
     expiresIn: value.JWT_EXPIRES_IN as string,
