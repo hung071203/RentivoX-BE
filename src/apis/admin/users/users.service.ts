@@ -83,6 +83,8 @@ export class UsersService {
       fullName: dto.fullName,
       role: dto.role,
       phone: dto.phone,
+      dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+      gender: dto.gender ?? null,
     });
     return this.userRepo.save(user);
   }
@@ -112,6 +114,8 @@ export class UsersService {
 
     if (dto.fullName) user.fullName = dto.fullName;
     if (dto.phone) user.phone = dto.phone;
+    if (dto.dateOfBirth !== undefined) user.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
+    if (dto.gender !== undefined) user.gender = dto.gender ?? null;
     return this.userRepo.save(user);
   }
 

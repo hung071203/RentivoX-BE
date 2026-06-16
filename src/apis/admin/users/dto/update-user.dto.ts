@@ -1,13 +1,16 @@
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsOptional,
   IsPhoneNumber,
   IsString,
+  Validate,
 } from 'class-validator';
-import { UserRole } from '@lib/common/enums';
+import { Gender } from '@lib/common/enums';
 import { Trim } from '@lib/decorators';
+import { MinAge18Constraint } from './validators';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -28,4 +31,13 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isResetPassword?: boolean;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  @Validate(MinAge18Constraint)
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsEnum(Gender, { message: 'Giới tính không hợp lệ' })
+  gender?: Gender;
 }
