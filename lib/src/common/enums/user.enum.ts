@@ -4,3 +4,9 @@ export enum UserRole {
   LANDLORD = 'landlord',
   TENANT = 'tenant',
 }
+
+export enum Gender {
+  MALE = 'male',
+  FEMALE = 'female',
+  OTHER = 'other',
+}

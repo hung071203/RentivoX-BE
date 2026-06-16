@@ -1,6 +1,6 @@
 import { Column, Entity } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
-import { UserRole } from '../../src/common/enums';
+import { UserRole, Gender } from '../../src/common/enums';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -18,6 +18,12 @@ export class User extends BaseEntity {
 
   @Column({ nullable: true })
   phone: string;
+
+  @Column({ name: 'date_of_birth', type: 'date', nullable: true })
+  dateOfBirth: Date | null;
+
+  @Column({ type: 'enum', enum: Gender, nullable: true })
+  gender: Gender | null;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
