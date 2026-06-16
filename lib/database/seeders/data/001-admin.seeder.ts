@@ -20,7 +20,7 @@ export class AdminSeeder extends BaseSeeder {
       email: ENV.admin.email,
       passwordHash,
       fullName: 'System Admin',
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       isActive: true,
     });
   }

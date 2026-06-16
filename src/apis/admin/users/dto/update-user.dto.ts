@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsOptional,
   IsPhoneNumber,
@@ -15,13 +16,14 @@ export class UpdateUserDto {
   fullName?: string;
 
   @IsOptional()
+  @IsEmail({}, { message: 'Email không hợp lệ' })
+  @Trim()
+  email?: string;
+
+  @IsOptional()
   @IsPhoneNumber('VN', { message: 'Số điện thoại không hợp lệ' })
   @Trim()
   phone?: string;
-
-  @IsOptional()
-  @IsEnum(UserRole, { message: 'Role không hợp lệ' })
-  role?: UserRole;
 
   @IsOptional()
   @IsBoolean()
