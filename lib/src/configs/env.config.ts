@@ -20,6 +20,16 @@ const schema = Joi.object({
 
   JWT_SECRET: Joi.string().required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
+
+  REDIS_HOST: Joi.string().default('localhost'),
+  REDIS_PORT: Joi.number().default(6379),
+  REDIS_PASSWORD: Joi.string().optional().allow(''),
+
+  MAIL_HOST: Joi.string().required(),
+  MAIL_PORT: Joi.number().default(587),
+  MAIL_USER: Joi.string().required(),
+  MAIL_PASS: Joi.string().required(),
+  MAIL_FROM: Joi.string().required(),
 }).unknown(true);
 
 const { error, value } = schema.validate(process.env);
@@ -45,5 +55,17 @@ export const ENV = {
   admin: {
     email: value.ADMIN_EMAIL as string,
     password: value.ADMIN_PASSWORD as string,
+  },
+  redis: {
+    host: value.REDIS_HOST as string,
+    port: value.REDIS_PORT as number,
+    password: value.REDIS_PASSWORD as string,
+  },
+  mail: {
+    host: value.MAIL_HOST as string,
+    port: value.MAIL_PORT as number,
+    user: value.MAIL_USER as string,
+    pass: value.MAIL_PASS as string,
+    from: value.MAIL_FROM as string,
   },
 };

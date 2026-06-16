@@ -13,6 +13,9 @@ import { AuthUtil } from '@lib/utils/auth.util';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetUsersDto } from './dto/get-users.dto';
+import { WorkersService } from '../../../workers/workers.service';
+import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
+import { MailTemplates } from '@lib/common/constants/mail.constant';
 
 const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 
@@ -21,6 +24,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+
+    private readonly workersService: WorkersService,
   ) {}
 
   async findAll(dto: GetUsersDto): Promise<PaginatedResult<User>> {
@@ -68,8 +73,13 @@ export class UsersService {
       throw new ForbiddenException('Tài khoản khách hàng do chủ trọ quản lý');
     }
     // Chỉ super_admin mới tạo được admin
-    if (dto.role === UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Chỉ quản trị viên cấp cao mới có thể tạo tài khoản admin');
+    if (
+      dto.role === UserRole.ADMIN &&
+      currentUser.role !== UserRole.SUPER_ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Chỉ quản trị viên cấp cao mới có thể tạo tài khoản admin',
+      );
     }
 
     const exists = await this.userRepo.findOne({ where: { email: dto.email } });
@@ -86,7 +96,18 @@ export class UsersService {
       dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
       gender: dto.gender ?? null,
     });
-    return this.userRepo.save(user);
+    const data = await this.userRepo.save(user);
+
+    this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+      to: dto.email,
+      template: MailTemplates.CREATE_USER,
+      context: {
+        email: dto.email,
+        password,
+      },
+    });
+
+    return data;
   }
 
   async update(id: string, dto: UpdateUserDto, currentUser: User) {
@@ -97,26 +118,46 @@ export class UsersService {
       throw new ForbiddenException('Tài khoản khách hàng do chủ trọ quản lý');
     }
     // Admin thường không chỉnh sửa được super_admin hoặc admin khác
-    if (currentUser.role === UserRole.ADMIN && ADMIN_ROLES.includes(user.role)) {
+    if (
+      currentUser.role === UserRole.ADMIN &&
+      ADMIN_ROLES.includes(user.role)
+    ) {
       throw new ForbiddenException('Không có quyền chỉnh sửa tài khoản này');
     }
 
+    let newPassword: string | null = null;
     if (dto.isResetPassword) {
-      const newPassword = AuthUtil.generateRandomPassword();
+      newPassword = AuthUtil.generateRandomPassword();
       user.passwordHash = await AuthUtil.hashPassword(newPassword);
     }
 
     if (dto.email && dto.email !== user.email) {
-      const exists = await this.userRepo.findOne({ where: { email: dto.email } });
+      const exists = await this.userRepo.findOne({
+        where: { email: dto.email },
+      });
       if (exists) throw new ConflictException('Email đã tồn tại');
       user.email = dto.email;
     }
 
     if (dto.fullName) user.fullName = dto.fullName;
     if (dto.phone) user.phone = dto.phone;
-    if (dto.dateOfBirth !== undefined) user.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
+    if (dto.dateOfBirth !== undefined)
+      user.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
     if (dto.gender !== undefined) user.gender = dto.gender ?? null;
-    return this.userRepo.save(user);
+    const data = await this.userRepo.save(user);
+
+    if (newPassword) {
+      this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+        to: data.email,
+        template: MailTemplates.PASSWORD_RESET,
+        context: {
+          email: data.email,
+          password: newPassword,
+        },
+      });
+    }
+
+    return data;
   }
 
   async toggleActive(id: string, currentUser: User) {
@@ -125,8 +166,13 @@ export class UsersService {
     if (user.role === UserRole.TENANT) {
       throw new ForbiddenException('Tài khoản khách hàng do chủ trọ quản lý');
     }
-    if (currentUser.role === UserRole.ADMIN && ADMIN_ROLES.includes(user.role)) {
-      throw new ForbiddenException('Không có quyền thao tác trên tài khoản này');
+    if (
+      currentUser.role === UserRole.ADMIN &&
+      ADMIN_ROLES.includes(user.role)
+    ) {
+      throw new ForbiddenException(
+        'Không có quyền thao tác trên tài khoản này',
+      );
     }
 
     user.isActive = !user.isActive;
@@ -139,7 +185,10 @@ export class UsersService {
     if (user.role === UserRole.TENANT) {
       throw new ForbiddenException('Tài khoản khách hàng do chủ trọ quản lý');
     }
-    if (currentUser.role === UserRole.ADMIN && ADMIN_ROLES.includes(user.role)) {
+    if (
+      currentUser.role === UserRole.ADMIN &&
+      ADMIN_ROLES.includes(user.role)
+    ) {
       throw new ForbiddenException('Không có quyền xóa tài khoản này');
     }
 
