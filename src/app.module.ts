@@ -5,6 +5,7 @@ import { ENV } from '../lib/src/configs/env.config';
 import { AuthModule } from './apis/auth/auth.module';
 import { AdminModule } from './apis/admin/admin.module';
 import { ProfileModule } from './apis/profile/profile.module';
+import { LandlordModule } from './apis/landlord/landlord.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import path from 'path';
@@ -63,6 +64,7 @@ import {
     AuthModule,
     AdminModule,
     ProfileModule,
+    LandlordModule,
     MailsModule,
     WorkersModule,
   ],
