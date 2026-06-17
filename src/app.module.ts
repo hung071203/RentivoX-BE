@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { ENV } from '../lib/src/configs/env.config';
 import { AuthModule } from './apis/auth/auth.module';
 import { AdminModule } from './apis/admin/admin.module';
@@ -8,9 +9,10 @@ import { ProfileModule } from './apis/profile/profile.module';
 import { LandlordModule } from './apis/landlord/landlord.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
-import path from 'path';
+import path, { join } from 'path';
 import { MailsModule } from './mails/mails.module';
 import { WorkersModule } from './workers/workers.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { BullModule } from '@nestjs/bullmq';
 import {
   BULLMQ_PREFIX,
@@ -61,6 +63,12 @@ import {
       prefix: `${ENV.nodeEnv}:${BULLMQ_PREFIX}`,
       defaultJobOptions: defaultBullmqJobOptions,
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: { index: false },
+    }),
+    UploadsModule,
     AuthModule,
     AdminModule,
     ProfileModule,

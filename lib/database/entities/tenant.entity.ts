@@ -1,5 +1,6 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
+import { Gender } from '../../src/common/enums';
 import { User } from './user.entity';
 
 @Entity('tenants')
@@ -38,6 +39,9 @@ export class Tenant extends BaseEntity {
 
   @Column({ name: 'date_of_birth', type: 'date', nullable: true })
   dateOfBirth: Date;
+
+  @Column({ type: 'enum', enum: Gender, nullable: true })
+  gender: Gender | null;
 
   @Column({ name: 'permanent_address', type: 'text', nullable: true })
   permanentAddress: string;
