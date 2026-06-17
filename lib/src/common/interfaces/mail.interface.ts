@@ -5,6 +5,12 @@ export interface SendAccountContext {
   password: string;
 }
 
+export interface OtpMailContext {
+  otp: string;
+  expiresInMinutes: number;
+  purpose: string;
+}
+
 type BaseMailOptions = {
   to: string;
   from?: string;
@@ -17,4 +23,9 @@ export interface SendPassMailOptions extends BaseMailOptions {
   context: SendAccountContext;
 }
 
-export type MailOptions = SendPassMailOptions;
+export interface SendOtpMailOptions extends BaseMailOptions {
+  template: MailTemplates.OTP;
+  context: OtpMailContext;
+}
+
+export type MailOptions = SendPassMailOptions | SendOtpMailOptions;

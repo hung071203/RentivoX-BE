@@ -8,15 +8,22 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../../lib/database/entities/user.entity';
 import { AuthUtil } from '../../../lib/src/utils/auth.util';
+import { OtpContext, OtpService } from '../../../lib/src/services/otp.service';
+import { WorkersService } from '../../workers/workers.service';
+import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
+import { MailTemplates } from '@lib/common/constants/mail.constant';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateEmailDto } from './dto/update-email.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { SendOtpEmailDto } from './dto/send-otp-email.dto';
 
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly otpService: OtpService,
+    private readonly workersService: WorkersService,
   ) {}
 
   private async findById(id: string): Promise<User> {
@@ -53,19 +60,41 @@ export class ProfileService {
     return this.findById(userId);
   }
 
-  async updateEmail(userId: string, dto: UpdateEmailDto): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('Người dùng không tồn tại');
-
-    const isMatch = await AuthUtil.comparePassword(dto.currentPassword, user.passwordHash);
-    if (!isMatch) throw new BadRequestException('Mật khẩu hiện tại không đúng');
-
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+  async sendOtpForEmailChange(
+    userId: string,
+    dto: SendOtpEmailDto,
+  ): Promise<{ message: string }> {
+    const existing = await this.userRepo.findOne({ where: { email: dto.newEmail } });
     if (existing && existing.id !== userId) {
-      throw new ConflictException('Email đã được sử dụng');
+      throw new ConflictException('Email đã được sử dụng bởi tài khoản khác.');
     }
 
-    await this.userRepo.update(userId, { email: dto.email });
+    const otp = await this.otpService.request(OtpContext.CHANGE_EMAIL, userId, {
+      newEmail: dto.newEmail,
+    });
+
+    this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+      to: dto.newEmail,
+      template: MailTemplates.OTP,
+      context: { otp, expiresInMinutes: 10, purpose: 'xác nhận đổi email' },
+    });
+
+    return { message: `Mã OTP đã được gửi đến ${dto.newEmail}.` };
+  }
+
+  async updateEmail(userId: string, dto: UpdateEmailDto): Promise<User> {
+    const data = await this.otpService.verify(OtpContext.CHANGE_EMAIL, userId, dto.otp);
+
+    if (data.newEmail !== dto.newEmail) {
+      throw new BadRequestException('Email không khớp với yêu cầu OTP.');
+    }
+
+    const existing = await this.userRepo.findOne({ where: { email: dto.newEmail } });
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('Email đã được sử dụng bởi tài khoản khác.');
+    }
+
+    await this.userRepo.update(userId, { email: dto.newEmail });
     return this.findById(userId);
   }
 

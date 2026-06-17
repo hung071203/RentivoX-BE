@@ -7,6 +7,8 @@ import { JwtStrategy } from '../../../lib/src/guards/jwt.strategy';
 import { ENV } from '../../../lib/src/configs/env.config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { OtpModule } from '../../../lib/src/shared-modules/otp.module';
+import { WorkersModule } from '../../workers/workers.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { AuthController } from './auth.controller';
       signOptions: { expiresIn: ENV.jwt.expiresIn as any },
     }),
     TypeOrmModule.forFeature([User]),
+    OtpModule,
+    WorkersModule,
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],

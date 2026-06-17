@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+          <!-- Header -->
+          <tr>
+            <td style="background:#4f46e5;padding:32px 40px">
+              <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700">RentivoX</h1>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 40px">
+              <h2 style="margin:0 0 16px;color:#111;font-size:18px">Mã xác thực OTP</h2>
+              <p style="margin:0 0 24px;color:#444;line-height:1.6">
+                Bạn đã yêu cầu mã OTP để <strong>{{purpose}}</strong>. Mã của bạn là:
+              </p>
+              <div style="text-align:center;margin:0 0 24px">
+                <span style="display:inline-block;background:#f0f0ff;border:2px dashed #4f46e5;border-radius:8px;padding:16px 32px;font-size:32px;font-weight:700;letter-spacing:8px;color:#4f46e5;font-family:monospace">{{otp}}</span>
+              </div>
+              <p style="margin:0;color:#888;font-size:13px">
+                ⏱ Mã có hiệu lực trong <strong>{{expiresInMinutes}} phút</strong>. Không chia sẻ mã này với bất kỳ ai.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 40px;border-top:1px solid #eee;color:#999;font-size:12px">
+              © 2025 RentivoX — Hệ thống quản lý nhà trọ thông minh
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

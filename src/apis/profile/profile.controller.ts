@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../lib/src/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../lib/src/decorators/current-user.decorator';
 import { User } from '../../../lib/database/entities/user.entity';
@@ -6,6 +6,7 @@ import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateEmailDto } from './dto/update-email.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { SendOtpEmailDto } from './dto/send-otp-email.dto';
 
 @Controller('profile')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +21,12 @@ export class ProfileController {
   @Patch()
   updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
     return this.profileService.updateProfile(user.id, dto);
+  }
+
+  @Post('email/send-otp')
+  @HttpCode(HttpStatus.OK)
+  sendOtpForEmailChange(@CurrentUser() user: User, @Body() dto: SendOtpEmailDto) {
+    return this.profileService.sendOtpForEmailChange(user.id, dto);
   }
 
   @Patch('email')
