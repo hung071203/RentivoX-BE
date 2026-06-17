@@ -1,4 +1,5 @@
 import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+
 import { PaginationDto } from '@lib/common/dto';
 import { RoomStatus, RoomType } from '@lib/common/enums';
 import { Trim } from '@lib/decorators';
@@ -20,4 +21,8 @@ export class GetRoomsDto extends PaginationDto {
   @IsOptional()
   @IsEnum(RoomType)
   roomType?: RoomType;
+
+  @IsOptional()
+  @IsIn(['roomNumber', 'basePrice', 'areaM2', 'createdAt'], { message: 'orderBy không hợp lệ' })
+  declare orderBy?: string;
 }

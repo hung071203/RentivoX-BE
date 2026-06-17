@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
+
 import { PaginationDto } from '@lib/common/dto';
 import { UserRole } from '@lib/common/enums';
 import { Trim } from '@lib/decorators';
@@ -18,4 +19,8 @@ export class GetUsersDto extends PaginationDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsIn(['fullName', 'email', 'createdAt'], { message: 'orderBy không hợp lệ' })
+  declare orderBy?: string;
 }
