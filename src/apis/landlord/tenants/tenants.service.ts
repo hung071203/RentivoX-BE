@@ -79,6 +79,11 @@ export class TenantsService {
   }
 
   async create(dto: CreateTenantDto, landlord: User): Promise<Tenant> {
+    const idCardConflict = await this.tenantRepo.findOne({
+      where: { idCardNumber: dto.idCardNumber },
+    });
+    if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
+
     if (dto.createAccount) {
       if (!dto.email)
         throw new BadRequestException('Cần có email để tạo tài khoản');
@@ -117,6 +122,13 @@ export class TenantsService {
   async update(id: string, dto: UpdateTenantDto, landlord: User): Promise<Tenant> {
     const tenant = await this.findOne(id, landlord);
     const hadAccount = !!tenant.userId;
+
+    if (dto.idCardNumber && dto.idCardNumber !== tenant.idCardNumber) {
+      const idCardConflict = await this.tenantRepo.findOne({
+        where: { idCardNumber: dto.idCardNumber },
+      });
+      if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
+    }
 
     if (dto.email && dto.email !== tenant.email && tenant.userId) {
       const conflict = await this.userRepo.findOne({ where: { email: dto.email } });
