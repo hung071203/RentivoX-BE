@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Property } from '@entities/property.entity';
+import { Room } from '@entities/room.entity';
 import { User } from '@entities/user.entity';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -17,6 +19,9 @@ export class PropertiesService {
   constructor(
     @InjectRepository(Property)
     private readonly propertyRepo: Repository<Property>,
+
+    @InjectRepository(Room)
+    private readonly roomRepo: Repository<Room>,
   ) {}
 
   async findAll(
@@ -75,6 +80,16 @@ export class PropertiesService {
 
   async remove(id: string, landlord: User): Promise<void> {
     const property = await this.findOne(id, landlord);
+
+    const roomCount = await this.roomRepo.count({
+      where: { propertyId: property.id },
+    });
+    if (roomCount > 0) {
+      throw new BadRequestException(
+        `Không thể xóa nhà trọ đang có ${roomCount} phòng. Vui lòng xóa hết phòng trước.`,
+      );
+    }
+
     await this.propertyRepo.remove(property);
   }
 }
