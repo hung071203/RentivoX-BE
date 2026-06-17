@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -27,10 +32,15 @@ export class AuthService {
       where: { email: dto.email, isActive: true },
     });
 
-    if (!user) throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    if (!user)
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
 
-    const isMatch = await AuthUtil.comparePassword(dto.password, user.passwordHash);
-    if (!isMatch) throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    const isMatch = await AuthUtil.comparePassword(
+      dto.password,
+      user.passwordHash,
+    );
+    if (!isMatch)
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
 
     const payload = { sub: user.id, email: user.email, role: user.role };
     const token = this.jwtService.sign(payload);
@@ -46,17 +56,18 @@ export class AuthService {
     };
   }
 
-  async sendForgotPasswordOtp(dto: ForgotPasswordDto): Promise<{ message: string }> {
-    const GENERIC_MSG = 'Nếu email tồn tại trong hệ thống, mã OTP đã được gửi đến hộp thư của bạn.';
-
+  async sendForgotPasswordOtp(dto: ForgotPasswordDto): Promise<boolean> {
     const user = await this.userRepo.findOne({
       where: { email: dto.email, isActive: true },
     });
 
     // Không tiết lộ email có tồn tại hay không
-    if (!user) return { message: GENERIC_MSG };
+    if (!user) return true;
 
-    const otp = await this.otpService.request(OtpContext.FORGOT_PASSWORD, user.id);
+    const otp = await this.otpService.request(
+      OtpContext.FORGOT_PASSWORD,
+      user.id,
+    );
 
     this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
       to: user.email,
@@ -64,7 +75,7 @@ export class AuthService {
       context: { otp, expiresInMinutes: 10, purpose: 'đặt lại mật khẩu' },
     });
 
-    return { message: GENERIC_MSG };
+    return true;
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
@@ -79,8 +90,12 @@ export class AuthService {
 
     await this.otpService.verify(OtpContext.FORGOT_PASSWORD, user.id, dto.otp);
 
-    const isSame = await AuthUtil.comparePassword(dto.newPassword, user.passwordHash);
-    if (isSame) throw new BadRequestException('Mật khẩu mới phải khác mật khẩu cũ.');
+    const isSame = await AuthUtil.comparePassword(
+      dto.newPassword,
+      user.passwordHash,
+    );
+    if (isSame)
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu cũ.');
 
     const hash = await AuthUtil.hashPassword(dto.newPassword);
     await this.userRepo.update(user.id, { passwordHash: hash });
