@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
 import { Contract } from './contract.entity';
+import { Tenant } from './tenant.entity';
 
 @Entity('room_occupants')
 export class RoomOccupant extends BaseEntity {
@@ -11,14 +12,15 @@ export class RoomOccupant extends BaseEntity {
   @JoinColumn({ name: 'contract_id' })
   contract: Contract;
 
-  @Column({ name: 'full_name' })
-  fullName: string;
+  @Column({ name: 'tenant_id' })
+  tenantId: string;
 
-  @Column({ name: 'id_card_number', nullable: true })
-  idCardNumber: string;
+  @ManyToOne(() => Tenant)
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant;
 
-  @Column({ nullable: true })
-  phone: string;
+  @Column({ name: 'is_owner', default: false })
+  isOwner: boolean;
 
   @Column({ name: 'moved_in_date', type: 'date' })
   movedInDate: Date;

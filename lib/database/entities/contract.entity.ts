@@ -13,13 +13,6 @@ export class Contract extends BaseEntity {
   @JoinColumn({ name: 'room_id' })
   room: Room;
 
-  @Column({ name: 'tenant_id' })
-  tenantId: string;
-
-  @ManyToOne(() => Tenant)
-  @JoinColumn({ name: 'tenant_id' })
-  tenant: Tenant;
-
   @Column({ name: 'rent_amount', type: 'bigint' })
   rentAmount: number;
 
@@ -32,7 +25,11 @@ export class Contract extends BaseEntity {
   @Column({ name: 'end_date', type: 'date' })
   endDate: Date;
 
-  @Column({ type: 'enum', enum: ContractStatus, default: ContractStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: ContractStatus,
+    default: ContractStatus.PENDING,
+  })
   status: ContractStatus;
 
   @Column({ name: 'terminated_date', type: 'date', nullable: true })

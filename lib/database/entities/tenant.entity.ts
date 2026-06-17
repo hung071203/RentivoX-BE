@@ -41,4 +41,10 @@ export class Tenant extends BaseEntity {
 
   @Column({ name: 'permanent_address', type: 'text', nullable: true })
   permanentAddress: string;
+
+  @Column({ name: 'id_card_front_url', nullable: true })
+  idCardFrontUrl: string;
+
+  @Column({ name: 'id_card_back_url', nullable: true })
+  idCardBackUrl: string;
 }
