@@ -26,10 +26,9 @@ export class CreateTenantDto {
   @Trim()
   phone?: string;
 
-  @IsOptional()
   @IsString()
   @Trim()
-  idCardNumber?: string;
+  idCardNumber: string;
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày cấp CCCD không hợp lệ' })

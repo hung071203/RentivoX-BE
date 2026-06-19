@@ -1,3 +1,7 @@
+export const DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
+export const CRON_OPTIONS = { timeZone: DEFAULT_TIMEZONE };
+
 export const RegexPatterns = {
   password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/,
 };

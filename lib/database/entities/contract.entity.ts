@@ -28,7 +28,7 @@ export class Contract extends BaseEntity {
   @Column({
     type: 'enum',
     enum: ContractStatus,
-    default: ContractStatus.PENDING,
+    default: ContractStatus.ACTIVE,
   })
   status: ContractStatus;
 

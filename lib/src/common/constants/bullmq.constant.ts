@@ -14,6 +14,7 @@ export const defaultBullmqJobOptions: DefaultJobOptions = {
 export enum BullmqQueuesEnum {
   NOTIFICATION = 'notification',
   EMAIL = 'email',
+  CONTRACT = 'contract',
 }
 
 export enum BullmqNotificationJobEnum {
@@ -22,6 +23,10 @@ export enum BullmqNotificationJobEnum {
 
 export enum BullmqEmailJobEnum {
   SEND_EMAIL = 'send_email',
+}
+
+export enum BullmqContractJobEnum {
+  APPLY_AMENDMENT = 'apply_amendment',
 }
 
 export const BULLMQ_PREFIX = 'bullmq';

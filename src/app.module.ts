@@ -7,6 +7,7 @@ import { AuthModule } from './apis/auth/auth.module';
 import { AdminModule } from './apis/admin/admin.module';
 import { ProfileModule } from './apis/profile/profile.module';
 import { LandlordModule } from './apis/landlord/landlord.module';
+import { CronsModule } from './crons/crons.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import path, { join } from 'path';
@@ -14,6 +15,7 @@ import { MailsModule } from './mails/mails.module';
 import { WorkersModule } from './workers/workers.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import {
   BULLMQ_PREFIX,
   defaultBullmqJobOptions,
@@ -22,6 +24,7 @@ import {
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: ENV.db.host,
@@ -73,6 +76,7 @@ import {
     AdminModule,
     ProfileModule,
     LandlordModule,
+    CronsModule,
     MailsModule,
     WorkersModule,
   ],

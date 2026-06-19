@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Room } from '@entities/room.entity';
 import { Property } from '@entities/property.entity';
 import { Contract } from '@entities/contract.entity';
@@ -119,7 +119,7 @@ export class RoomsService {
     const activeContracts = await this.contractRepo.count({
       where: {
         roomId: room.id,
-        status: In([ContractStatus.ACTIVE, ContractStatus.PENDING]),
+        status: ContractStatus.ACTIVE,
       },
     });
     if (activeContracts > 0) {

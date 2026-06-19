@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto';
 export type UploadFolder = 'id-cards' | 'contracts';
 
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_DOC_MIMES = ['application/pdf', 'image/jpeg', 'image/png'];
+const ALLOWED_DOC_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 export function multerConfig(
   folder: UploadFolder,

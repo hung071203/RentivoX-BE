@@ -39,11 +39,10 @@ export class CreateRoomDto {
   @Min(0)
   basePrice: number;
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  maxOccupants?: number;
+  maxOccupants: number;
 
   @IsOptional()
   @IsBoolean()
