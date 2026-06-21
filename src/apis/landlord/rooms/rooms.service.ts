@@ -11,7 +11,7 @@ import { Room } from '@entities/room.entity';
 import { Property } from '@entities/property.entity';
 import { Contract } from '@entities/contract.entity';
 import { User } from '@entities/user.entity';
-import { ContractStatus } from '@lib/common/enums';
+import { ContractStatus, RoomStatus } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
@@ -62,6 +62,21 @@ export class RoomsService {
       .take(limit);
 
     const [items, total] = await qb.getManyAndCount();
+
+    if (items.length > 0) {
+      const roomIds = items.map((r) => r.id);
+      const counts: { roomId: string; cnt: string }[] = await this.roomRepo.query(
+        `SELECT c.room_id AS roomId, COUNT(ro.id) AS cnt
+         FROM room_occupants ro
+         INNER JOIN contracts c ON c.id = ro.contract_id
+         WHERE c.room_id IN (?) AND c.status = ? AND ro.moved_out_date IS NULL
+         GROUP BY c.room_id`,
+        [roomIds, 'active'],
+      );
+      const countMap = new Map(counts.map((r) => [r.roomId, Number(r.cnt)]));
+      items.forEach((r) => (r.occupantCount = countMap.get(r.id) ?? 0));
+    }
+
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
@@ -73,6 +88,16 @@ export class RoomsService {
     if (!room) throw new NotFoundException('Không tìm thấy phòng');
     if (room.property.landlordId !== landlord.id)
       throw new ForbiddenException('Không có quyền truy cập');
+
+    const counts: { cnt: string }[] = await this.roomRepo.query(
+      `SELECT COUNT(ro.id) AS cnt
+       FROM room_occupants ro
+       INNER JOIN contracts c ON c.id = ro.contract_id
+       WHERE c.room_id = ? AND c.status = ? AND ro.moved_out_date IS NULL`,
+      [id, 'active'],
+    );
+    room.occupantCount = Number(counts[0]?.cnt ?? 0);
+
     return room;
   }
 
@@ -106,6 +131,23 @@ export class RoomsService {
       if (existing)
         throw new ConflictException(
           `Phòng số "${dto.roomNumber}" đã tồn tại trong nhà trọ này`,
+        );
+    }
+
+    if (dto.status && dto.status !== room.status) {
+      if (room.status === RoomStatus.OCCUPIED)
+        throw new BadRequestException(
+          'Không thể thay đổi trạng thái phòng đang có người thuê. Hãy chấm dứt hợp đồng trước.',
+        );
+      const validTransitions: Record<RoomStatus, RoomStatus[]> = {
+        [RoomStatus.AVAILABLE]: [RoomStatus.MAINTENANCE, RoomStatus.RESERVED],
+        [RoomStatus.MAINTENANCE]: [RoomStatus.AVAILABLE],
+        [RoomStatus.RESERVED]: [RoomStatus.AVAILABLE],
+        [RoomStatus.OCCUPIED]: [],
+      };
+      if (!validTransitions[room.status].includes(dto.status))
+        throw new BadRequestException(
+          `Không thể chuyển trạng thái từ "${room.status}" sang "${dto.status}"`,
         );
     }
 

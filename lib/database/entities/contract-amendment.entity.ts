@@ -23,6 +23,9 @@ export class ContractAmendment extends BaseEntity {
   @Column({ name: 'amendment_type', type: 'enum', enum: AmendmentType })
   amendmentType: AmendmentType;
 
+  @Column({ type: 'varchar', length: 255 })
+  title: string;
+
   @Column({ name: 'effective_date', type: 'date' })
   effectiveDate: Date;
 

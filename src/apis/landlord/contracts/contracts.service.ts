@@ -26,6 +26,7 @@ import { Tenant } from '@entities/tenant.entity';
 import { Service } from '@entities/service.entity';
 import { User } from '@entities/user.entity';
 import {
+  AmendmentType,
   ContractStatus,
   DocumentType,
   RoomStatus,
@@ -306,6 +307,14 @@ export class ContractsService {
         'Chỉ có thể tạo phụ lục cho hợp đồng đang hoạt động',
       );
 
+    const pendingAmendment = await this.contractAmendmentRepo.findOne({
+      where: { contractId: id, isApplied: false },
+    });
+    if (pendingAmendment)
+      throw new BadRequestException(
+        'Hợp đồng đang có phụ lục chưa được áp dụng. Vui lòng chờ phụ lục hiện tại có hiệu lực trước khi tạo mới.',
+      );
+
     const room = contract.room as Room;
     if (dto.serviceChanges?.length) {
       for (const change of dto.serviceChanges) {
@@ -365,10 +374,20 @@ export class ContractsService {
       });
       const savedDoc = await manager.save(ContractDocument, doc);
 
+      const [d, m, y] = dto.effectiveDate.split('-').reverse();
+      const typeLabel =
+        dto.amendmentType === AmendmentType.RENEWAL
+          ? 'Gia hạn hợp đồng'
+          : dto.amendmentType === AmendmentType.PRICE_ADJUSTMENT
+            ? 'Điều chỉnh giá'
+            : 'Phụ lục bổ sung';
+      const generatedTitle = `${typeLabel} - ${d}/${m}/${y}`;
+
       const amendment = manager.create(ContractAmendment, {
         contractId: id,
         documentId: savedDoc.id,
         amendmentType: dto.amendmentType,
+        title: generatedTitle,
         effectiveDate: new Date(dto.effectiveDate),
         newRentAmount: (dto.newRentAmount ?? null) as unknown as number,
         newEndDate: dto.newEndDate
@@ -737,6 +756,36 @@ export class ContractsService {
       amendment.isApplied = true;
       await manager.save(ContractAmendment, amendment);
     });
+  }
+
+  // Cron gọi mỗi ngày để expire hợp đồng hết hạn
+  async expireContracts(): Promise<number> {
+    const todayVn = DateUtils.getFormatDateInTimezone(
+      new Date(),
+      DEFAULT_TIMEZONE,
+      DateFormatEnum.YYYY_MM_DD,
+    );
+
+    const expiredContracts = await this.contractRepo
+      .createQueryBuilder('c')
+      .select(['c.id', 'c.roomId'])
+      .where('c.status = :status', { status: ContractStatus.ACTIVE })
+      .andWhere('c.endDate < :today', { today: todayVn })
+      .getMany();
+
+    if (!expiredContracts.length) return 0;
+
+    await this.dataSource.transaction(async (manager) => {
+      const contractIds = expiredContracts.map((c) => c.id);
+      const roomIds = expiredContracts.map((c) => c.roomId);
+
+      await manager.update(Contract, contractIds, {
+        status: ContractStatus.EXPIRED,
+      });
+      await manager.update(Room, roomIds, { status: RoomStatus.AVAILABLE });
+    });
+
+    return expiredContracts.length;
   }
 
   private assertOwnership(contract: Contract, landlordId: string): void {

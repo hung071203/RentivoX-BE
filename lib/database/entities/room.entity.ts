@@ -44,4 +44,7 @@ export class Room extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   notes: string;
+
+  // Computed — not a DB column, populated by service queries
+  occupantCount?: number;
 }
