@@ -36,16 +36,6 @@ export class OccupantInput {
   movedInDate: string;
 }
 
-export class ContractServiceInput {
-  @IsUUID()
-  serviceId: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  unitPrice: number;
-}
-
 export class CreateContractDto {
   @IsUUID()
   roomId: string;
@@ -74,10 +64,4 @@ export class CreateContractDto {
   @IsArray()
   @ValidateNested({ each: true })
   occupants: OccupantInput[];
-
-  @IsOptional()
-  @Transform(({ value }) => plainToInstance(ContractServiceInput, parseJsonArray(value)))
-  @IsArray()
-  @ValidateNested({ each: true })
-  services?: ContractServiceInput[];
 }

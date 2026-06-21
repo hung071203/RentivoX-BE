@@ -9,6 +9,10 @@ export class GetServicesDto extends PaginationDto {
   propertyId?: string;
 
   @IsOptional()
+  @IsUUID()
+  roomId?: string;
+
+  @IsOptional()
   @IsEnum(ServiceType)
   type?: ServiceType;
 

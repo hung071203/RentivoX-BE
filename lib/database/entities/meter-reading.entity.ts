@@ -1,16 +1,24 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
-import { ContractService } from './contract-service.entity';
+import { Room } from './room.entity';
+import { Service } from './service.entity';
 import { User } from './user.entity';
 
 @Entity('meter_readings')
 export class MeterReading extends BaseEntity {
-  @Column({ name: 'contract_service_id' })
-  contractServiceId: string;
+  @Column({ name: 'room_id' })
+  roomId: string;
 
-  @ManyToOne(() => ContractService)
-  @JoinColumn({ name: 'contract_service_id' })
-  contractService: ContractService;
+  @ManyToOne(() => Room)
+  @JoinColumn({ name: 'room_id' })
+  room: Room;
+
+  @Column({ name: 'service_id' })
+  serviceId: string;
+
+  @ManyToOne(() => Service)
+  @JoinColumn({ name: 'service_id' })
+  service: Service;
 
   @Column({ type: 'date' })
   period: Date;

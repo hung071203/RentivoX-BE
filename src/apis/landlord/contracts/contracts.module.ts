@@ -10,7 +10,7 @@ import { ContractService as ContractServiceEntity } from '@entities/contract-ser
 import { RoomOccupant } from '@entities/room-occupant.entity';
 import { Room } from '@entities/room.entity';
 import { Tenant } from '@entities/tenant.entity';
-import { Service } from '@entities/service.entity';
+import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { Invoice } from '@entities/invoice.entity';
 import { UploadsModule } from '../../../uploads/uploads.module';
 import { ContractsController } from './contracts.controller';
@@ -27,7 +27,7 @@ import { ContractsService } from './contracts.service';
       RoomOccupant,
       Room,
       Tenant,
-      Service,
+      RoomServiceEntity,
       Invoice,
     ]),
     UploadsModule,

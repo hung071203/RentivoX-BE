@@ -21,9 +21,9 @@ import { ContractAmendmentService as ContractAmendmentServiceEntity } from '@ent
 import { ContractService as ContractServiceEntity } from '@entities/contract-service.entity';
 import { RoomOccupant } from '@entities/room-occupant.entity';
 import { Room } from '@entities/room.entity';
+import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { Invoice } from '@entities/invoice.entity';
 import { Tenant } from '@entities/tenant.entity';
-import { Service } from '@entities/service.entity';
 import { User } from '@entities/user.entity';
 import {
   AmendmentType,
@@ -66,11 +66,11 @@ export class ContractsService {
     @InjectRepository(Room)
     private readonly roomRepo: Repository<Room>,
 
+    @InjectRepository(RoomServiceEntity)
+    private readonly roomServiceRepo: Repository<RoomServiceEntity>,
+
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
-
-    @InjectRepository(Service)
-    private readonly serviceRepo: Repository<Service>,
 
     private readonly uploadsService: UploadsService,
 
@@ -225,17 +225,14 @@ export class ContractsService {
       await this.assertTenantHasNoActiveContract(occ.tenantId);
     }
 
-    if (dto.services?.length) {
-      for (const svc of dto.services) {
-        const service = await this.serviceRepo.findOne({
-          where: { id: svc.serviceId, propertyId: room.propertyId },
-        });
-        if (!service)
-          throw new NotFoundException(
-            `Không tìm thấy dịch vụ: ${svc.serviceId}`,
-          );
-      }
-    }
+    // Phòng phải có ít nhất 1 dịch vụ được gắn (room_services)
+    const roomServices = await this.roomServiceRepo.find({
+      where: { roomId: dto.roomId },
+    });
+    if (roomServices.length === 0)
+      throw new BadRequestException(
+        'Phòng chưa có dịch vụ nào. Vui lòng thêm dịch vụ cho phòng trước khi tạo hợp đồng.',
+      );
 
     const fileUrl = this.uploadsService.getFileUrl('contracts', file.filename);
 
@@ -264,16 +261,15 @@ export class ContractsService {
       );
       await manager.save(RoomOccupant, occupants);
 
-      if (dto.services?.length) {
-        const contractServices = dto.services.map((s) =>
-          manager.create(ContractServiceEntity, {
-            contractId: saved.id,
-            serviceId: s.serviceId,
-            unitPrice: s.unitPrice,
-          }),
-        );
-        await manager.save(ContractServiceEntity, contractServices);
-      }
+      // Auto-copy room_services → contract_services (snapshot giá tại thời điểm ký)
+      const contractServices = roomServices.map((rs) =>
+        manager.create(ContractServiceEntity, {
+          contractId: saved.id,
+          serviceId: rs.serviceId,
+          unitPrice: rs.unitPrice,
+        }),
+      );
+      await manager.save(ContractServiceEntity, contractServices);
 
       const doc = manager.create(ContractDocument, {
         contractId: saved.id,
@@ -331,19 +327,21 @@ export class ContractsService {
               `Không tìm thấy dịch vụ hợp đồng: ${change.contractServiceId}`,
             );
         } else if (change.serviceId) {
-          const service = await this.serviceRepo.findOne({
-            where: { id: change.serviceId, propertyId: room.propertyId },
+          // Dịch vụ phải có trong room_services của phòng
+          const roomService = await this.roomServiceRepo.findOne({
+            where: { roomId: room.id, serviceId: change.serviceId },
+            relations: { service: true },
           });
-          if (!service)
-            throw new NotFoundException(
-              `Không tìm thấy dịch vụ: ${change.serviceId}`,
+          if (!roomService)
+            throw new BadRequestException(
+              `Dịch vụ không có trong danh sách dịch vụ của phòng. Hãy thêm dịch vụ vào phòng trước.`,
             );
           const exists = await this.contractServiceRepo.findOne({
             where: { serviceId: change.serviceId, contractId: id },
           });
           if (exists)
             throw new BadRequestException(
-              `Dịch vụ "${service.name}" đã có trong hợp đồng`,
+              `Dịch vụ "${roomService.service.name}" đã có trong hợp đồng`,
             );
         }
       }

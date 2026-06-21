@@ -1,23 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { Trim } from '@lib/decorators';
-import { ServiceType } from '@lib/common/enums';
+import { IsBoolean, IsInt, IsOptional, Min } from 'class-validator';
 
 export class UpdateServiceDto {
-  @IsOptional()
-  @IsString()
-  @Trim()
-  name?: string;
-
-  @IsOptional()
-  @IsEnum(ServiceType)
-  type?: ServiceType;
-
-  @IsOptional()
-  @IsString()
-  @Trim()
-  unit?: string;
-
   @IsOptional()
   @IsInt()
   @Min(0)

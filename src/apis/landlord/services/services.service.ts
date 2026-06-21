@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Service } from '@entities/service.entity';
 import { Property } from '@entities/property.entity';
 import { ContractService } from '@entities/contract-service.entity';
+import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { User } from '@entities/user.entity';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreateServiceDto } from './dto/create-service.dto';
@@ -26,6 +27,9 @@ export class ServicesService {
 
     @InjectRepository(ContractService)
     private readonly contractServiceRepo: Repository<ContractService>,
+
+    @InjectRepository(RoomServiceEntity)
+    private readonly roomServiceRepo: Repository<RoomServiceEntity>,
   ) {}
 
   async findAll(dto: GetServicesDto, landlord: User): Promise<PaginatedResult<Service>> {
@@ -48,6 +52,16 @@ export class ServicesService {
     }
     if (dto.isActive !== undefined) {
       qb.andWhere('service.isActive = :isActive', { isActive: dto.isActive });
+    }
+    if (dto.roomId) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM room_services rs
+          WHERE rs.service_id = service.id
+            AND rs.room_id = :roomId
+        )`,
+        { roomId: dto.roomId },
+      );
     }
 
     qb.orderBy(`service.${orderBy}`, orderDirection)

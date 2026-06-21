@@ -134,6 +134,12 @@ export class RoomsService {
         );
     }
 
+    if (dto.maxOccupants !== undefined && dto.maxOccupants < (room.occupantCount ?? 0)) {
+      throw new BadRequestException(
+        `Số người tối đa không được nhỏ hơn số người đang ở hiện tại (${room.occupantCount})`,
+      );
+    }
+
     if (dto.status && dto.status !== room.status) {
       if (room.status === RoomStatus.OCCUPIED)
         throw new BadRequestException(

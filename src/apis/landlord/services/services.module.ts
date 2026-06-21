@@ -3,11 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Service } from '@entities/service.entity';
 import { Property } from '@entities/property.entity';
 import { ContractService } from '@entities/contract-service.entity';
+import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { LandlordServicesController } from './services.controller';
 import { ServicesService } from './services.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Service, Property, ContractService])],
+  imports: [TypeOrmModule.forFeature([Service, Property, ContractService, RoomServiceEntity])],
   controllers: [LandlordServicesController],
   providers: [ServicesService],
   exports: [ServicesService],
