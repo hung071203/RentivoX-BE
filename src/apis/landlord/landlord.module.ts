@@ -6,6 +6,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { LandlordServicesModule } from './services/services.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { MeterReadingsModule } from './meter-readings/meter-readings.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MeterReadingsModule } from './meter-readings/meter-readings.module';
     LandlordServicesModule,
     ContractsModule,
     MeterReadingsModule,
+    InvoicesModule,
   ],
 })
 export class LandlordModule {}

@@ -8,7 +8,7 @@ export class InvoiceItem extends BaseEntity {
   @Column({ name: 'invoice_id' })
   invoiceId: string;
 
-  @ManyToOne(() => Invoice)
+  @ManyToOne(() => Invoice, (inv) => inv.items)
   @JoinColumn({ name: 'invoice_id' })
   invoice: Invoice;
 
