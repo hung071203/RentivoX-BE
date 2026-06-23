@@ -146,7 +146,7 @@ export class ContractsService {
       }),
       this.contractAmendmentRepo.find({
         where: { contractId: id },
-        relations: { document: true },
+        relations: { document: true, amendmentServices: { contractService: { service: true } } },
         order: { effectiveDate: 'DESC' },
       }),
     ]);

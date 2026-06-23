@@ -11,6 +11,10 @@ export class GetMeterReadingsDto extends PaginationDto {
   roomId?: string;
 
   @IsOptional()
+  @IsUUID()
+  serviceId?: string;
+
+  @IsOptional()
   @IsDateString({}, { message: 'period phải là ngày hợp lệ (YYYY-MM-DD)' })
   period?: string;
 

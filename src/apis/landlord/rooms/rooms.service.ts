@@ -134,6 +134,16 @@ export class RoomsService {
         );
     }
 
+    if (dto.roomType && dto.roomType !== room.roomType) {
+      const activeContractCount = await this.contractRepo.count({
+        where: { roomId: room.id, status: ContractStatus.ACTIVE },
+      });
+      if (activeContractCount > 0)
+        throw new BadRequestException(
+          'Không thể thay đổi loại phòng khi đang có hợp đồng còn hiệu lực',
+        );
+    }
+
     if (dto.maxOccupants !== undefined && dto.maxOccupants < (room.occupantCount ?? 0)) {
       throw new BadRequestException(
         `Số người tối đa không được nhỏ hơn số người đang ở hiện tại (${room.occupantCount})`,

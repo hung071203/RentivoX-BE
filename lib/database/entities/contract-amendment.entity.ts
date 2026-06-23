@@ -1,8 +1,9 @@
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
 import { AmendmentType } from '../../src/common/enums';
 import { Contract } from './contract.entity';
 import { ContractDocument } from './contract-document.entity';
+import { ContractAmendmentService } from './contract-amendment-service.entity';
 
 @Entity('contract_amendments')
 export class ContractAmendment extends BaseEntity {
@@ -40,4 +41,7 @@ export class ContractAmendment extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   notes: string;
+
+  @OneToMany(() => ContractAmendmentService, (s) => s.amendment)
+  amendmentServices: ContractAmendmentService[];
 }

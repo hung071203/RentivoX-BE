@@ -68,6 +68,9 @@ export class MeterReadingsService {
     if (dto.roomId) {
       qb.andWhere('room.id = :roomId', { roomId: dto.roomId });
     }
+    if (dto.serviceId) {
+      qb.andWhere('svc.id = :serviceId', { serviceId: dto.serviceId });
+    }
     if (dto.period) {
       qb.andWhere('mr.period = :period', { period: dto.period });
     }
@@ -164,13 +167,12 @@ export class MeterReadingsService {
     }
 
     // No duplicate reading for same room + service + period
-    const duplicate = await this.meterReadingRepo.findOne({
-      where: {
-        roomId: dto.roomId,
-        serviceId: dto.serviceId,
-        period: new Date(dto.period) as any,
-      },
-    });
+    const duplicate = await this.meterReadingRepo
+      .createQueryBuilder('mr')
+      .where('mr.roomId = :roomId', { roomId: dto.roomId })
+      .andWhere('mr.serviceId = :serviceId', { serviceId: dto.serviceId })
+      .andWhere('mr.period = :period', { period: dto.period })
+      .getOne();
     if (duplicate) {
       throw new BadRequestException('Đã tồn tại bản ghi chỉ số cho dịch vụ này trong kỳ này');
     }
@@ -178,7 +180,7 @@ export class MeterReadingsService {
     const mr = this.meterReadingRepo.create({
       roomId: dto.roomId,
       serviceId: dto.serviceId,
-      period: new Date(dto.period) as any,
+      period: new Date(dto.period),
       valueStart: dto.valueStart,
       valueEnd: dto.valueEnd,
       recordedAt: new Date(),
