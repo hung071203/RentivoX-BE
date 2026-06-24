@@ -13,7 +13,10 @@ import { RoomService as RoomServiceEntity } from '@entities/room-service.entity'
 import { Invoice } from '@entities/invoice.entity';
 import { User } from '@entities/user.entity';
 import { ContractStatus, InvoiceStatus, ServiceType } from '@lib/common/enums';
-import { DateFormatEnum, DEFAULT_TIMEZONE } from '@lib/common/constants/app.constant';
+import {
+  DateFormatEnum,
+  DEFAULT_TIMEZONE,
+} from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreateMeterReadingDto } from './dto/create-meter-reading.dto';
@@ -42,7 +45,10 @@ export class MeterReadingsService {
     private readonly invoiceRepo: Repository<Invoice>,
   ) {}
 
-  async findAll(dto: GetMeterReadingsDto, landlord: User): Promise<PaginatedResult<any>> {
+  async findAll(
+    dto: GetMeterReadingsDto,
+    landlord: User,
+  ): Promise<PaginatedResult<any>> {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
     const orderBy = dto.orderBy ?? 'period';
@@ -55,10 +61,18 @@ export class MeterReadingsService {
       .innerJoin('mr.service', 'svc')
       .leftJoin('mr.recordedBy', 'rb')
       .addSelect([
-        'room.id', 'room.roomNumber', 'room.roomType', 'room.propertyId',
-        'property.id', 'property.name',
-        'svc.id', 'svc.name', 'svc.unit', 'svc.unitPrice',
-        'rb.id', 'rb.fullName',
+        'room.id',
+        'room.roomNumber',
+        'room.roomType',
+        'room.propertyId',
+        'property.id',
+        'property.name',
+        'svc.id',
+        'svc.name',
+        'svc.unit',
+        'svc.unitPrice',
+        'rb.id',
+        'rb.fullName',
       ])
       .where('property.landlordId = :landlordId', { landlordId: landlord.id });
 
@@ -99,13 +113,23 @@ export class MeterReadingsService {
       .innerJoin('mr.service', 'svc')
       .leftJoin('mr.recordedBy', 'rb')
       .addSelect([
-        'room.id', 'room.roomNumber', 'room.roomType', 'room.propertyId',
-        'property.id', 'property.name',
-        'svc.id', 'svc.name', 'svc.unit', 'svc.unitPrice',
-        'rb.id', 'rb.fullName',
+        'room.id',
+        'room.roomNumber',
+        'room.roomType',
+        'room.propertyId',
+        'property.id',
+        'property.name',
+        'svc.id',
+        'svc.name',
+        'svc.unit',
+        'svc.unitPrice',
+        'rb.id',
+        'rb.fullName',
       ])
       .where('mr.id = :id', { id })
-      .andWhere('property.landlordId = :landlordId', { landlordId: landlord.id })
+      .andWhere('property.landlordId = :landlordId', {
+        landlordId: landlord.id,
+      })
       .getOne();
 
     if (!mr) throw new NotFoundException('Không tìm thấy bản ghi chỉ số');
@@ -116,11 +140,17 @@ export class MeterReadingsService {
 
   async create(dto: CreateMeterReadingDto, landlord: User): Promise<any> {
     if (dto.valueEnd < dto.valueStart) {
-      throw new BadRequestException('Chỉ số cuối kỳ không được nhỏ hơn chỉ số đầu kỳ');
+      throw new BadRequestException(
+        'Chỉ số cuối kỳ không được nhỏ hơn chỉ số đầu kỳ',
+      );
     }
 
     // Only allow current month or previous month
-    const todayVn = DateUtils.getFormatDateInTimezone(new Date(), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD);
+    const todayVn = DateUtils.getFormatDateInTimezone(
+      new Date(),
+      DEFAULT_TIMEZONE,
+      DateFormatEnum.YYYY_MM_DD,
+    );
     const [curYear, curMonth] = todayVn.split('-').map(Number);
     const prevMonth = curMonth === 1 ? 12 : curMonth - 1;
     const prevYear = curMonth === 1 ? curYear - 1 : curYear;
@@ -128,7 +158,9 @@ export class MeterReadingsService {
     const isCurrentMonth = pYear === curYear && pMonth === curMonth;
     const isPrevMonth = pYear === prevYear && pMonth === prevMonth;
     if (!isCurrentMonth && !isPrevMonth) {
-      throw new BadRequestException('Chỉ được ghi chỉ số cho tháng hiện tại hoặc tháng trước');
+      throw new BadRequestException(
+        'Chỉ được ghi chỉ số cho tháng hiện tại hoặc tháng trước',
+      );
     }
 
     // Verify room ownership
@@ -137,7 +169,9 @@ export class MeterReadingsService {
       .innerJoin('room.property', 'property')
       .addSelect(['property.id', 'property.landlordId'])
       .where('room.id = :id', { id: dto.roomId })
-      .andWhere('property.landlordId = :landlordId', { landlordId: landlord.id })
+      .andWhere('property.landlordId = :landlordId', {
+        landlordId: landlord.id,
+      })
       .getOne();
 
     if (!room) throw new NotFoundException('Không tìm thấy phòng');
@@ -152,7 +186,9 @@ export class MeterReadingsService {
       .getOne();
 
     if (!service) {
-      throw new NotFoundException('Không tìm thấy dịch vụ đo đếm cho nhà trọ này');
+      throw new NotFoundException(
+        'Không tìm thấy dịch vụ đo đếm cho nhà trọ này',
+      );
     }
 
     // Service must be attached to this room via room_services
@@ -174,7 +210,9 @@ export class MeterReadingsService {
       .andWhere('mr.period = :period', { period: dto.period })
       .getOne();
     if (duplicate) {
-      throw new BadRequestException('Đã tồn tại bản ghi chỉ số cho dịch vụ này trong kỳ này');
+      throw new BadRequestException(
+        'Đã tồn tại bản ghi chỉ số cho dịch vụ này trong kỳ này',
+      );
     }
 
     const mr = this.meterReadingRepo.create({
@@ -191,13 +229,19 @@ export class MeterReadingsService {
     return this.findOne(saved.id, landlord);
   }
 
-  async update(id: string, dto: UpdateMeterReadingDto, landlord: User): Promise<any> {
+  async update(
+    id: string,
+    dto: UpdateMeterReadingDto,
+    landlord: User,
+  ): Promise<any> {
     const mr = await this.loadForMutation(id, landlord);
 
     const valueStart = dto.valueStart ?? Number(mr.valueStart);
     const valueEnd = dto.valueEnd ?? Number(mr.valueEnd);
     if (valueEnd < valueStart) {
-      throw new BadRequestException('Chỉ số cuối kỳ không được nhỏ hơn chỉ số đầu kỳ');
+      throw new BadRequestException(
+        'Chỉ số cuối kỳ không được nhỏ hơn chỉ số đầu kỳ',
+      );
     }
 
     if (dto.valueStart !== undefined) mr.valueStart = dto.valueStart;
@@ -214,33 +258,43 @@ export class MeterReadingsService {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  private async loadForMutation(id: string, landlord: User): Promise<MeterReading> {
+  private async loadForMutation(
+    id: string,
+    landlord: User,
+  ): Promise<MeterReading> {
     const mr = await this.meterReadingRepo
       .createQueryBuilder('mr')
       .innerJoin('mr.room', 'room')
       .innerJoin('room.property', 'property')
       .where('mr.id = :id', { id })
-      .andWhere('property.landlordId = :landlordId', { landlordId: landlord.id })
+      .andWhere('property.landlordId = :landlordId', {
+        landlordId: landlord.id,
+      })
       .getOne();
 
     if (!mr) throw new NotFoundException('Không tìm thấy bản ghi chỉ số');
-    await this.assertInvoiceNotPaid(mr.roomId, mr.period);
+    await this.assertInvoiceNotExists(mr.roomId, mr.period);
     return mr;
   }
 
-  // Block if any paid invoice exists for any contract in this room for the period
-  private async assertInvoiceNotPaid(roomId: string, period: Date): Promise<void> {
+  // Block if any invoice exists for any contract in this room for the period
+  private async assertInvoiceNotExists(
+    roomId: string,
+    period: Date | string,
+  ): Promise<void> {
     const paid = await this.invoiceRepo
       .createQueryBuilder('inv')
       .innerJoin('inv.contract', 'c')
       .where('c.roomId = :roomId', { roomId })
       .andWhere('inv.period = :period', { period })
-      .andWhere('inv.status = :status', { status: InvoiceStatus.PAID })
+      .andWhere('inv.status IN (:...statuses)', {
+        statuses: [InvoiceStatus.UNPAID, InvoiceStatus.PAID],
+      })
       .getOne();
 
     if (paid) {
       throw new BadRequestException(
-        'Không thể thay đổi chỉ số khi hóa đơn tháng này đã thanh toán',
+        'Không thể thay đổi bản ghi chỉ số vì đã có hóa đơn cho kỳ này',
       );
     }
   }
@@ -276,9 +330,17 @@ export class MeterReadingsService {
   private enrich(mr: MeterReading, contractCountMap: Map<string, number>): any {
     const consumption = Number(mr.valueEnd) - Number(mr.valueStart);
     const unitPrice = Number(mr.service?.unitPrice ?? 0);
-    const contractCount = contractCountMap.get(`${mr.roomId}:${mr.serviceId}`) ?? 1;
+    const contractCount =
+      contractCountMap.get(`${mr.roomId}:${mr.serviceId}`) ?? 1;
     const amountPerContract = consumption * unitPrice;
     const totalAmount = amountPerContract * contractCount;
-    return { ...mr, consumption, contractCount, unitPrice, amountPerContract, totalAmount };
+    return {
+      ...mr,
+      consumption,
+      contractCount,
+      unitPrice,
+      amountPerContract,
+      totalAmount,
+    };
   }
 }
