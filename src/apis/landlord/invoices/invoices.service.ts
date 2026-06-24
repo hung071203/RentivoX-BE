@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { Invoice } from '@entities/invoice.entity';
 import { InvoiceItem } from '@entities/invoice-item.entity';
 import { Contract } from '@entities/contract.entity';
@@ -213,6 +213,19 @@ export class InvoicesService {
       );
     }
 
+    // Validate: period không được trước tháng bắt đầu hợp đồng
+    const startDateStr = DateUtils.getFormatDateInTimezone(
+      new Date(contract.startDate),
+      DEFAULT_TIMEZONE,
+      DateFormatEnum.YYYY_MM_DD,
+    );
+    const contractStartMonth = startDateStr.substring(0, 8) + '01';
+    if (periodDate < contractStartMonth) {
+      throw new BadRequestException(
+        `Hợp đồng bắt đầu ${this.formatPeriod(startDateStr)}, không thể tạo hóa đơn cho kỳ trước đó`,
+      );
+    }
+
     const contractServices = await this.contractServiceRepo
       .createQueryBuilder('cs')
       .innerJoinAndSelect('cs.service', 'svc')
@@ -251,23 +264,38 @@ export class InvoicesService {
       );
     }
 
-    // Số hợp đồng active cùng phòng (chia đều chỉ số cho phòng ghép)
+    // Số hợp đồng cùng phòng hoạt động trong kỳ (chia đều chỉ số cho phòng ghép)
     const serviceIds = meteredServices.map((cs) => cs.serviceId);
     const contractCountMap = await this.loadContractCountsForRoom(
       contract.roomId,
       serviceIds,
+      periodDate,
     );
 
     const periodLabel = this.formatPeriod(periodDate);
     const items: Partial<InvoiceItem>[] = [];
 
-    // Tiền phòng
+    // Tiền phòng — prorate nếu hợp đồng bắt đầu giữa tháng kỳ đó
+    const [pYear, pMonth] = periodDate.split('-').map(Number);
+    const daysInMonth = new Date(pYear, pMonth, 0).getDate();
+    const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
+
+    const isFirstMonth = sYear === pYear && sMonth === pMonth && sDay > 1;
+    const activeDays = isFirstMonth ? daysInMonth - sDay + 1 : daysInMonth;
+    const rentFull = Number(contract.rentAmount);
+    const rentAmount = isFirstMonth
+      ? Math.round((rentFull * activeDays) / daysInMonth)
+      : rentFull;
+    const rentDescription = isFirstMonth
+      ? `Tiền phòng ${periodLabel} (${activeDays}/${daysInMonth} ngày)`
+      : `Tiền phòng ${periodLabel}`;
+
     items.push({
-      description: `Tiền phòng ${periodLabel}`,
+      description: rentDescription,
       contractServiceId: undefined,
       quantity: 1,
-      unitPrice: Number(contract.rentAmount),
-      amount: Number(contract.rentAmount),
+      unitPrice: rentAmount,
+      amount: rentAmount,
     });
 
     // Dịch vụ cố định
@@ -359,9 +387,14 @@ export class InvoicesService {
   private async loadContractCountsForRoom(
     roomId: string,
     serviceIds: string[],
+    periodDate: string,
   ): Promise<Map<string, number>> {
     const map = new Map<string, number>();
     if (!serviceIds.length) return map;
+
+    const [pYear, pMonth] = periodDate.split('-').map(Number);
+    const lastDay = new Date(pYear, pMonth, 0).getDate();
+    const periodEnd = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     const rows = await this.contractServiceRepo
       .createQueryBuilder('cs')
@@ -369,7 +402,28 @@ export class InvoicesService {
       .select('cs.serviceId', 'serviceId')
       .addSelect('COUNT(*)', 'cnt')
       .where('c.roomId = :roomId', { roomId })
-      .andWhere('c.status = :status', { status: ContractStatus.ACTIVE })
+      .andWhere('c.startDate <= :periodEnd', { periodEnd })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('c.status = :statusActive', {
+            statusActive: ContractStatus.ACTIVE,
+          })
+            .orWhere(
+              'c.status = :statusTerminated AND c.terminatedDate >= :periodStart',
+              {
+                statusTerminated: ContractStatus.TERMINATED,
+                periodStart: periodDate,
+              },
+            )
+            .orWhere(
+              'c.status = :statusExpired AND c.endDate >= :periodStart2',
+              {
+                statusExpired: ContractStatus.EXPIRED,
+                periodStart2: periodDate,
+              },
+            );
+        }),
+      )
       .andWhere('cs.serviceId IN (:...serviceIds)', { serviceIds })
       .groupBy('cs.serviceId')
       .getRawMany();

@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -65,9 +66,13 @@ export class CreateContractDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Ghi chú không được vượt quá 5000 ký tự' })
+  @Trim()
   notes?: string;
 
-  @Transform(({ value }) => plainToInstance(OccupantInput, parseJsonArray(value)))
+  @Transform(({ value }) =>
+    plainToInstance(OccupantInput, parseJsonArray(value)),
+  )
   @IsArray()
   @ValidateNested({ each: true })
   occupants: OccupantInput[];

@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -58,6 +59,7 @@ export class CreateRoomDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Ghi chú không được vượt quá 5000 ký tự' })
   @Trim()
   notes?: string;
 }

@@ -1,6 +1,7 @@
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '@lib/common/dto';
 import { InvoiceStatus } from '@lib/common/enums';
+import { Trim } from '@lib/decorators';
 
 export class GetInvoicesDto extends PaginationDto {
   @IsOptional()
@@ -21,6 +22,7 @@ export class GetInvoicesDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  @Trim()
   period?: string; // "YYYY-MM"
 
   @IsOptional()

@@ -1,6 +1,7 @@
 import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '@lib/common/dto';
 import { ContractStatus } from '@lib/common/enums';
+import { Trim } from '@lib/decorators';
 
 export class GetContractsDto extends PaginationDto {
   @IsOptional()
@@ -17,6 +18,7 @@ export class GetContractsDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  @Trim()
   search?: string;
 
   @IsOptional()
