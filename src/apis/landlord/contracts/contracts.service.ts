@@ -110,7 +110,7 @@ export class ContractsService {
       qb.andWhere('contract.status = :status', { status: dto.status });
     }
     if (dto.search) {
-      qb.andWhere('room.roomNumber LIKE :search', {
+      qb.andWhere('room.roomNumber LIKE :search OR contract.contractNumber LIKE :search', {
         search: `%${dto.search}%`,
       });
     }
