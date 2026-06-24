@@ -8,5 +8,6 @@ export class UpdateEmailDto {
 
   @IsString()
   @Length(6, 6, { message: 'Mã OTP gồm 6 chữ số' })
+  @Trim()
   otp: string;
 }

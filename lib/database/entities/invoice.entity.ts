@@ -6,6 +6,9 @@ import { InvoiceItem } from './invoice-item.entity';
 
 @Entity('invoices')
 export class Invoice extends BaseEntity {
+  @Column({ name: 'invoice_number', length: 50, unique: true })
+  invoiceNumber: string;
+
   @Column({ name: 'contract_id' })
   contractId: string;
 

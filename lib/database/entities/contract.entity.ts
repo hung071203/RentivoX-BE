@@ -2,10 +2,12 @@ import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
 import { ContractStatus } from '../../src/common/enums';
 import { Room } from './room.entity';
-import { Tenant } from './tenant.entity';
 
 @Entity('contracts')
 export class Contract extends BaseEntity {
+  @Column({ name: 'contract_number', length: 50, unique: true })
+  contractNumber: string;
+
   @Column({ name: 'room_id' })
   roomId: string;
 

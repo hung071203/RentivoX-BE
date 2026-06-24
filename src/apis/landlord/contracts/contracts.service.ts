@@ -239,6 +239,7 @@ export class ContractsService {
     // --- Writes: tất cả trong 1 transaction ---
     return this.dataSource.transaction(async (manager) => {
       const contract = manager.create(Contract, {
+        contractNumber: dto.contractNumber,
         roomId: dto.roomId,
         rentAmount: dto.rentAmount,
         depositAmount: dto.depositAmount,

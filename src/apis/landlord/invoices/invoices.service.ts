@@ -10,13 +10,18 @@ import { InvoiceItem } from '@entities/invoice-item.entity';
 import { Contract } from '@entities/contract.entity';
 import { ContractService as ContractServiceEntity } from '@entities/contract-service.entity';
 import { MeterReading } from '@entities/meter-reading.entity';
+import { RoomOccupant } from '@entities/room-occupant.entity';
 import { User } from '@entities/user.entity';
 import { ContractStatus, InvoiceStatus, ServiceType } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
-import { DateFormatEnum, DEFAULT_TIMEZONE } from '@lib/common/constants/app.constant';
+import {
+  DateFormatEnum,
+  DEFAULT_TIMEZONE,
+} from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { GetInvoicesDto } from './dto/get-invoices.dto';
+import { generateInvoiceNumber } from '@lib/helpers/app.helper';
 
 @Injectable()
 export class InvoicesService {
@@ -39,7 +44,10 @@ export class InvoicesService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(dto: GetInvoicesDto, landlord: User): Promise<PaginatedResult<any>> {
+  async findAll(
+    dto: GetInvoicesDto,
+    landlord: User,
+  ): Promise<PaginatedResult<any>> {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
     const orderBy = dto.orderBy ?? 'period';
@@ -51,9 +59,14 @@ export class InvoicesService {
       .innerJoin('c.room', 'room')
       .innerJoin('room.property', 'property')
       .addSelect([
-        'c.id', 'c.rentAmount', 'c.startDate', 'c.endDate',
-        'room.id', 'room.roomNumber',
-        'property.id', 'property.name',
+        'c.id',
+        'c.rentAmount',
+        'c.startDate',
+        'c.endDate',
+        'room.id',
+        'room.roomNumber',
+        'property.id',
+        'property.name',
       ])
       .where('property.landlordId = :landlordId', { landlordId: landlord.id });
 
@@ -91,17 +104,40 @@ export class InvoicesService {
       .leftJoin('items.contractService', 'cs')
       .leftJoin('cs.service', 'svc')
       .addSelect([
-        'c.id', 'c.rentAmount',
-        'room.id', 'room.roomNumber',
-        'property.id', 'property.name',
-        'cs.id', 'cs.serviceId',
-        'svc.id', 'svc.name', 'svc.type', 'svc.unit',
+        'c.id',
+        'c.rentAmount',
+        'c.startDate',
+        'c.endDate',
+        'room.id',
+        'room.roomNumber',
+        'property.id',
+        'property.name',
+        'cs.id',
+        'cs.serviceId',
+        'svc.id',
+        'svc.name',
+        'svc.type',
+        'svc.unit',
       ])
       .where('inv.id = :id', { id })
-      .andWhere('property.landlordId = :landlordId', { landlordId: landlord.id })
+      .andWhere('property.landlordId = :landlordId', {
+        landlordId: landlord.id,
+      })
       .getOne();
 
     if (!inv) throw new NotFoundException('Không tìm thấy hóa đơn');
+
+    // Lấy người đại diện (isOwner = true) của hợp đồng
+    const ownerOccupant = await this.dataSource
+      .getRepository(RoomOccupant)
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .addSelect(['t.id', 't.fullName', 't.phone', 't.email'])
+      .where('ro.contractId = :contractId', { contractId: inv.contractId })
+      .andWhere('ro.isOwner = :isOwner', { isOwner: true })
+      .getOne();
+
+    (inv.contract as any).owner = ownerOccupant?.tenant ?? null;
     return inv;
   }
 
@@ -114,11 +150,20 @@ export class InvoicesService {
       DateFormatEnum.YYYY_MM_DD,
     );
     if (periodDate > todayVn) {
-      throw new BadRequestException('Không thể tạo hóa đơn cho kỳ trong tương lai');
+      throw new BadRequestException(
+        'Không thể tạo hóa đơn cho kỳ trong tương lai',
+      );
     }
 
-    const contract = await this.loadContractWithOwnership(dto.contractId, landlord.id);
-    const invoice = await this.generateForContract(contract, periodDate, dto.notes);
+    const contract = await this.loadContractWithOwnership(
+      dto.contractId,
+      landlord.id,
+    );
+    const invoice = await this.generateForContract(
+      contract,
+      periodDate,
+      dto.notes,
+    );
     return this.findOne(invoice.id, landlord);
   }
 
@@ -129,7 +174,9 @@ export class InvoicesService {
       .innerJoin('c.room', 'room')
       .innerJoin('room.property', 'property')
       .where('inv.id = :id', { id })
-      .andWhere('property.landlordId = :landlordId', { landlordId: landlord.id })
+      .andWhere('property.landlordId = :landlordId', {
+        landlordId: landlord.id,
+      })
       .getOne();
 
     if (!inv) throw new NotFoundException('Không tìm thấy hóa đơn');
@@ -155,7 +202,9 @@ export class InvoicesService {
       .createQueryBuilder('inv')
       .where('inv.contractId = :contractId', { contractId: contract.id })
       .andWhere('inv.period = :period', { period: periodDate })
-      .andWhere('inv.status != :cancelled', { cancelled: InvoiceStatus.CANCELLED })
+      .andWhere('inv.status != :cancelled', {
+        cancelled: InvoiceStatus.CANCELLED,
+      })
       .getOne();
 
     if (existing) {
@@ -215,7 +264,7 @@ export class InvoicesService {
     // Tiền phòng
     items.push({
       description: `Tiền phòng ${periodLabel}`,
-      contractServiceId: null,
+      contractServiceId: undefined,
       quantity: 1,
       unitPrice: Number(contract.rentAmount),
       amount: Number(contract.rentAmount),
@@ -259,13 +308,17 @@ export class InvoicesService {
     const dueDate = this.getDueDate(periodDate);
 
     return this.dataSource.transaction(async (manager) => {
+      // Sinh mã hóa đơn HD-YYYYMM-XXXX theo thứ tự trong kỳ
+      const invoiceNumber = generateInvoiceNumber();
+
       const invoice = manager.create(Invoice, {
+        invoiceNumber,
         contractId: contract.id,
         period: new Date(periodDate),
         totalAmount,
         status: InvoiceStatus.UNPAID,
         dueDate,
-        notes: notes ?? null,
+        notes: notes ?? undefined,
       });
       const savedInvoice = await manager.save(invoice);
 
@@ -298,7 +351,8 @@ export class InvoicesService {
       .andWhere('c.status = :status', { status: ContractStatus.ACTIVE })
       .getOne();
 
-    if (!contract) throw new NotFoundException('Không tìm thấy hợp đồng đang hoạt động');
+    if (!contract)
+      throw new NotFoundException('Không tìm thấy hợp đồng đang hoạt động');
     return contract;
   }
 

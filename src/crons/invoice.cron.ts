@@ -35,7 +35,7 @@ export class InvoiceCron {
         try {
           await this.invoicesService.generateForContract(contract, periodDate);
           created++;
-        } catch (err) {
+        } catch (err: any) {
           skipped++;
           this.logger.warn(`Skip contract ${contract.id}: ${err.message}`);
         }

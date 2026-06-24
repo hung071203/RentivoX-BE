@@ -4,12 +4,14 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { Trim } from '@lib/decorators';
 
 function parseJsonArray(value: unknown): unknown[] {
   if (!value) return [];
@@ -37,6 +39,11 @@ export class OccupantInput {
 }
 
 export class CreateContractDto {
+  @Trim()
+  @IsString()
+  @IsNotEmpty()
+  contractNumber: string;
+
   @IsUUID()
   roomId: string;
 
