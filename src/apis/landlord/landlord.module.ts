@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LandlordDashboardModule } from './dashboard/dashboard.module';
 import { PropertiesModule } from './properties/properties.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { RoomServicesModule } from './room-services/room-services.module';
@@ -11,6 +12,7 @@ import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
+    LandlordDashboardModule,
     PropertiesModule,
     RoomsModule,
     RoomServicesModule,
