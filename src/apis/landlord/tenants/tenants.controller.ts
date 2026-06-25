@@ -60,6 +60,11 @@ export class TenantsController {
     return this.tenantsService.remove(id, user);
   }
 
+  @Patch(':id/toggle-active')
+  toggleActive(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.tenantsService.toggleActive(id, user);
+  }
+
   @Post(':id/id-card/front')
   @UseInterceptors(FileInterceptor('file', multerConfig('id-cards', 'image')))
   uploadIdCardFront(

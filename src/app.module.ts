@@ -7,6 +7,7 @@ import { AuthModule } from './apis/auth/auth.module';
 import { AdminModule } from './apis/admin/admin.module';
 import { ProfileModule } from './apis/profile/profile.module';
 import { LandlordModule } from './apis/landlord/landlord.module';
+import { TenantModule } from './apis/tenant/tenant.module';
 import { CronsModule } from './crons/crons.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
@@ -76,6 +77,7 @@ import {
     AdminModule,
     ProfileModule,
     LandlordModule,
+    TenantModule,
     CronsModule,
     MailsModule,
     WorkersModule,

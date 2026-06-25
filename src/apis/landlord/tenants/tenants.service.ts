@@ -47,6 +47,8 @@ export class TenantsService {
 
     const qb = this.tenantRepo
       .createQueryBuilder('tenant')
+      .leftJoin('tenant.user', 'u')
+      .addSelect(['u.id', 'u.isActive'])
       .where('tenant.landlordId = :landlordId', { landlordId: landlord.id });
 
     if (dto.search) {
@@ -71,11 +73,30 @@ export class TenantsService {
   }
 
   async findOne(id: string, landlord: User): Promise<Tenant> {
-    const tenant = await this.tenantRepo.findOne({ where: { id } });
+    const tenant = await this.tenantRepo
+      .createQueryBuilder('tenant')
+      .leftJoin('tenant.user', 'u')
+      .addSelect(['u.id', 'u.isActive'])
+      .where('tenant.id = :id', { id })
+      .getOne();
     if (!tenant) throw new NotFoundException('Không tìm thấy khách thuê');
     if (tenant.landlordId !== landlord.id)
       throw new ForbiddenException('Không có quyền truy cập');
     return tenant;
+  }
+
+  async toggleActive(id: string, landlord: User): Promise<Tenant> {
+    const tenant = await this.findOne(id, landlord);
+    if (!tenant.userId)
+      throw new BadRequestException('Khách thuê chưa có tài khoản');
+
+    const user = await this.userRepo.findOne({ where: { id: tenant.userId } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    user.isActive = !user.isActive;
+    await this.userRepo.save(user);
+
+    return this.findOne(id, landlord);
   }
 
   async create(dto: CreateTenantDto, landlord: User): Promise<Tenant> {
