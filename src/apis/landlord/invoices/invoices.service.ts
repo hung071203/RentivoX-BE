@@ -187,6 +187,17 @@ export class InvoicesService {
       throw new BadRequestException('Hóa đơn đã bị hủy rồi');
     }
 
+    const paymentCount = await this.dataSource
+      .getRepository('payments')
+      .createQueryBuilder('p')
+      .where('p.invoiceId = :invoiceId', { invoiceId: id })
+      .getCount();
+    if (paymentCount > 0) {
+      throw new BadRequestException(
+        'Không thể hủy hóa đơn đã có thanh toán',
+      );
+    }
+
     inv.status = InvoiceStatus.CANCELLED;
     return this.invoiceRepo.save(inv);
   }

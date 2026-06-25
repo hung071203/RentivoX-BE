@@ -7,6 +7,7 @@ import { LandlordServicesModule } from './services/services.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { MeterReadingsModule } from './meter-readings/meter-readings.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { InvoicesModule } from './invoices/invoices.module';
     ContractsModule,
     MeterReadingsModule,
     InvoicesModule,
+    PaymentsModule,
   ],
 })
 export class LandlordModule {}

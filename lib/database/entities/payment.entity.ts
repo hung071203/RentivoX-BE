@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../src/base/base.entity';
-import { PaymentMethod } from '../../src/common/enums';
+import { PaymentMethod, PaymentSource } from '../../src/common/enums';
 import { Invoice } from './invoice.entity';
 import { User } from './user.entity';
 
@@ -21,6 +21,13 @@ export class Payment extends BaseEntity {
 
   @Column({ name: 'payment_method', type: 'enum', enum: PaymentMethod })
   paymentMethod: PaymentMethod;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentSource,
+    default: PaymentSource.MANUAL,
+  })
+  source: PaymentSource;
 
   @Column({ name: 'reference_code', nullable: true })
   referenceCode: string;
