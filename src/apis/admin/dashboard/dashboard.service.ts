@@ -4,9 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from '@entities/user.entity';
 import { Property } from '@entities/property.entity';
 import { Room } from '@entities/room.entity';
-import { Contract } from '@entities/contract.entity';
-import { Invoice } from '@entities/invoice.entity';
-import { ContractStatus, InvoiceStatus, RoomStatus, UserRole } from '@lib/common/enums';
+import { RoomStatus, UserRole } from '@lib/common/enums';
 
 @Injectable()
 export class DashboardService {
@@ -14,62 +12,49 @@ export class DashboardService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Property) private readonly propertyRepo: Repository<Property>,
     @InjectRepository(Room) private readonly roomRepo: Repository<Room>,
-    @InjectRepository(Contract) private readonly contractRepo: Repository<Contract>,
-    @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
   ) {}
 
   async getStats() {
-    const [
-      totalUsers,
+    const [totalLandlords, totalTenants, totalProperties, totalRooms, occupiedRooms, topLandlords] =
+      await Promise.all([
+        this.userRepo.count({ where: { role: UserRole.LANDLORD } }),
+        this.userRepo.count({ where: { role: UserRole.TENANT } }),
+        this.propertyRepo.count(),
+        this.roomRepo.count(),
+        this.roomRepo.count({ where: { status: RoomStatus.OCCUPIED } }),
+        this.userRepo.manager.query<any[]>(`
+          SELECT
+            u.id,
+            u.full_name   AS fullName,
+            u.email,
+            COUNT(DISTINCT p.id) AS totalProperties,
+            COUNT(r.id)          AS totalRooms,
+            SUM(CASE WHEN r.status = 'occupied' THEN 1 ELSE 0 END) AS occupiedRooms
+          FROM users u
+          INNER JOIN properties p ON p.landlord_id = u.id
+          INNER JOIN rooms r      ON r.property_id = p.id
+          WHERE u.role = 'landlord'
+          GROUP BY u.id, u.full_name, u.email
+          ORDER BY COUNT(r.id) DESC
+          LIMIT 5
+        `),
+      ]);
+
+    return {
       totalLandlords,
       totalTenants,
       totalProperties,
       totalRooms,
-      availableRooms,
       occupiedRooms,
-      activeContracts,
-      paidInvoicesThisMonth,
-    ] = await Promise.all([
-      this.userRepo.count(),
-      this.userRepo.count({ where: { role: UserRole.LANDLORD } }),
-      this.userRepo.count({ where: { role: UserRole.TENANT } }),
-      this.propertyRepo.count(),
-      this.roomRepo.count(),
-      this.roomRepo.count({ where: { status: RoomStatus.AVAILABLE } }),
-      this.roomRepo.count({ where: { status: RoomStatus.OCCUPIED } }),
-      this.contractRepo.count({ where: { status: ContractStatus.ACTIVE } }),
-      this.invoiceRepo
-        .createQueryBuilder('invoice')
-        .select('SUM(invoice.totalAmount)', 'total')
-        .addSelect('COUNT(invoice.id)', 'count')
-        .where('invoice.status = :status', { status: InvoiceStatus.PAID })
-        .andWhere('invoice.period >= :startOfMonth', {
-          startOfMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        })
-        .getRawOne(),
-    ]);
-
-    return {
-      users: {
-        total: totalUsers,
-        landlords: totalLandlords,
-        tenants: totalTenants,
-      },
-      properties: {
-        total: totalProperties,
-      },
-      rooms: {
-        total: totalRooms,
-        available: availableRooms,
-        occupied: occupiedRooms,
-      },
-      contracts: {
-        active: activeContracts,
-      },
-      revenueThisMonth: {
-        total: Number(paidInvoicesThisMonth?.total ?? 0),
-        invoiceCount: Number(paidInvoicesThisMonth?.count ?? 0),
-      },
+      occupancyRate: totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0,
+      topLandlords: topLandlords.map((l) => ({
+        id: l.id as string,
+        fullName: l.fullName as string,
+        email: l.email as string,
+        totalProperties: Number(l.totalProperties),
+        totalRooms: Number(l.totalRooms),
+        occupiedRooms: Number(l.occupiedRooms),
+      })),
     };
   }
 }
