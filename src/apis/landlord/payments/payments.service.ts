@@ -70,6 +70,13 @@ export class PaymentsService {
         paymentMethod: dto.paymentMethod,
       });
     }
+
+    if (dto.source) {
+      qb.andWhere('p.source = :source ', {
+        source: dto.source,
+      });
+    }
+
     if (dto.referenceCode) {
       qb.andWhere('p.referenceCode LIKE :referenceCode', {
         referenceCode: `%${dto.referenceCode}%`,

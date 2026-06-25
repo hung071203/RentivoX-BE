@@ -1,7 +1,14 @@
-import { IsEnum, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { Trim } from '@lib/decorators';
 import { PaginationDto } from '@lib/common/dto';
-import { PaymentMethod } from '@lib/common/enums';
+import { PaymentMethod, PaymentSource } from '@lib/common/enums';
 
 export class GetPaymentsDto extends PaginationDto {
   @IsOptional()
@@ -21,6 +28,10 @@ export class GetPaymentsDto extends PaginationDto {
   @MaxLength(100)
   @Trim()
   referenceCode?: string;
+
+  @IsOptional()
+  @IsEnum(PaymentSource)
+  source?: PaymentSource;
 
   @IsOptional()
   @IsIn(['paymentDate', 'amount', 'createdAt'])
