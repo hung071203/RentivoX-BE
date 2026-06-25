@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Property } from '@entities/property.entity';
 import { Room } from '@entities/room.entity';
 import { User } from '@entities/user.entity';
@@ -61,6 +61,15 @@ export class PropertiesService {
   }
 
   async create(dto: CreatePropertyDto, landlord: User): Promise<Property> {
+    const existingProperty = await this.propertyRepo.findOne({
+      where: { name: dto.name, landlordId: landlord.id },
+    });
+    if (existingProperty) {
+      throw new BadRequestException(
+        'Nhà trọ với tên này đã tồn tại. Vui lòng chọn tên khác.',
+      );
+    }
+
     const property = this.propertyRepo.create({
       ...dto,
       landlordId: landlord.id,
@@ -73,6 +82,15 @@ export class PropertiesService {
     dto: UpdatePropertyDto,
     landlord: User,
   ): Promise<Property> {
+    const existingProperty = await this.propertyRepo.findOne({
+      where: { name: dto.name, landlordId: landlord.id, id: Not(id) },
+    });
+    if (existingProperty) {
+      throw new BadRequestException(
+        'Nhà trọ với tên này đã tồn tại. Vui lòng chọn tên khác.',
+      );
+    }
+
     const property = await this.findOne(id, landlord);
     Object.assign(property, dto);
     return this.propertyRepo.save(property);
