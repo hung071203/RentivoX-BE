@@ -45,14 +45,14 @@ export class DashboardService {
       .where('ro.tenantId = :tenantId', { tenantId })
       .andWhere('ro.movedOutDate IS NULL')
       .andWhere('c.status = :status', { status: ContractStatus.ACTIVE })
-      .select('ro.contractId')
+      .select('ro.contractId', 'contractId')
       .getRawOne();
 
     let activeContract: any = null;
     let currentRoom: any = null;
 
     if (activeOccupancy) {
-      const contractId: string = activeOccupancy.ro_contractId;
+      const contractId: string = activeOccupancy.contractId;
       const contract = await this.contractRepo.findOne({
         where: { id: contractId },
         relations: { room: { property: true } },
