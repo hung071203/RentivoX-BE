@@ -7,11 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../../lib/database/entities/user.entity';
+import { Tenant } from '../../../lib/database/entities/tenant.entity';
 import { AuthUtil } from '../../../lib/src/utils/auth.util';
 import { OtpContext, OtpService } from '../../../lib/src/services/otp.service';
 import { WorkersService } from '../../workers/workers.service';
 import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
 import { MailTemplates } from '@lib/common/constants/mail.constant';
+import { UserRole } from '@lib/common/enums';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateEmailDto } from './dto/update-email.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
@@ -22,6 +24,8 @@ export class ProfileService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
     private readonly otpService: OtpService,
     private readonly workersService: WorkersService,
   ) {}
@@ -46,18 +50,51 @@ export class ProfileService {
     return user;
   }
 
-  async getProfile(userId: string): Promise<User> {
-    return this.findById(userId);
+  async getProfile(userId: string): Promise<any> {
+    const user = await this.findById(userId);
+    if (user.role === UserRole.TENANT) {
+      const tenant = await this.tenantRepo.findOne({
+        where: { userId },
+        select: {
+          idCardNumber: true,
+          idCardIssuedDate: true,
+          idCardIssuedPlace: true,
+          permanentAddress: true,
+          idCardFrontUrl: true,
+          idCardBackUrl: true,
+        },
+      });
+      if (tenant) {
+        return {
+          ...user,
+          idCardNumber: tenant.idCardNumber ?? null,
+          idCardIssuedDate: tenant.idCardIssuedDate ?? null,
+          idCardIssuedPlace: tenant.idCardIssuedPlace ?? null,
+          permanentAddress: tenant.permanentAddress ?? null,
+          idCardFrontUrl: tenant.idCardFrontUrl ?? null,
+          idCardBackUrl: tenant.idCardBackUrl ?? null,
+        };
+      }
+    }
+    return user;
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
-    await this.userRepo.update(userId, {
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<any> {
+    const user = await this.findById(userId);
+    const sharedUpdates = {
       ...(dto.fullName !== undefined && { fullName: dto.fullName }),
       ...(dto.phone !== undefined && { phone: dto.phone }),
       ...(dto.dateOfBirth !== undefined && { dateOfBirth: dto.dateOfBirth as any }),
       ...(dto.gender !== undefined && { gender: dto.gender }),
-    });
-    return this.findById(userId);
+    };
+
+    await this.userRepo.update(userId, sharedUpdates);
+
+    if (user.role === UserRole.TENANT && Object.keys(sharedUpdates).length > 0) {
+      await this.tenantRepo.update({ userId }, sharedUpdates);
+    }
+
+    return this.getProfile(userId);
   }
 
   async sendOtpForEmailChange(
@@ -95,7 +132,13 @@ export class ProfileService {
     }
 
     await this.userRepo.update(userId, { email: dto.newEmail });
-    return this.findById(userId);
+
+    const user = await this.findById(userId);
+    if (user.role === UserRole.TENANT) {
+      await this.tenantRepo.update({ userId }, { email: dto.newEmail });
+    }
+
+    return this.getProfile(userId);
   }
 
   async updatePassword(userId: string, dto: UpdatePasswordDto): Promise<void> {
