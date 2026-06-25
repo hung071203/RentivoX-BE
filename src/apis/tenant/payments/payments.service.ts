@@ -19,7 +19,8 @@ export class PaymentsService {
 
   private async getTenantId(userId: string): Promise<string> {
     const tenant = await this.tenantRepo.findOne({ where: { userId } });
-    if (!tenant) throw new NotFoundException('Không tìm thấy thông tin khách thuê');
+    if (!tenant)
+      throw new NotFoundException('Không tìm thấy thông tin khách thuê');
     return tenant.id;
   }
 
@@ -39,6 +40,7 @@ export class PaymentsService {
       .innerJoin('inv.contract', 'c')
       .innerJoin('c.room', 'room')
       .innerJoin('room.property', 'property')
+      .innerJoin('p.recordedBy', 'recorder')
       .addSelect([
         'inv.id',
         'inv.invoiceNumber',
@@ -51,6 +53,8 @@ export class PaymentsService {
         'room.roomNumber',
         'property.id',
         'property.name',
+        'recorder.id',
+        'recorder.fullName',
       ])
       .where(
         `EXISTS (
@@ -91,6 +95,7 @@ export class PaymentsService {
       .innerJoin('inv.contract', 'c')
       .innerJoin('c.room', 'room')
       .innerJoin('room.property', 'property')
+      .innerJoin('p.recordedBy', 'recorder')
       .addSelect([
         'inv.id',
         'inv.invoiceNumber',
@@ -103,6 +108,8 @@ export class PaymentsService {
         'room.roomNumber',
         'property.id',
         'property.name',
+        'recorder.id',
+        'recorder.fullName',
       ])
       .where('p.id = :id', { id })
       .andWhere(
