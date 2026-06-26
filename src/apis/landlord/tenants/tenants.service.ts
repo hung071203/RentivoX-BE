@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Tenant } from '@entities/tenant.entity';
 import { User } from '@entities/user.entity';
 import { RoomOccupant } from '@entities/room-occupant.entity';
@@ -15,9 +15,7 @@ import { AuthUtil } from '@lib/utils/auth.util';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { WorkersService } from '../../../workers/workers.service';
 import { UploadsService } from '../../../uploads/uploads.service';
-import {
-  BullmqEmailJobEnum,
-} from '@lib/common/constants/bullmq.constant';
+import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
 import { MailTemplates } from '@lib/common/constants/mail.constant';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -35,6 +33,7 @@ export class TenantsService {
     @InjectRepository(RoomOccupant)
     private readonly roomOccupantRepo: Repository<RoomOccupant>,
 
+    private readonly dataSource: DataSource,
     private readonly workersService: WorkersService,
     private readonly uploadsService: UploadsService,
   ) {}
@@ -87,8 +86,7 @@ export class TenantsService {
 
   async toggleActive(id: string, landlord: User): Promise<Tenant> {
     const tenant = await this.findOne(id, landlord);
-    if (!tenant.userId)
-      throw new BadRequestException('Khách thuê chưa có tài khoản');
+    if (!tenant.userId) throw new BadRequestException('Khách thuê chưa có tài khoản');
 
     const user = await this.userRepo.findOne({ where: { id: tenant.userId } });
     if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
@@ -100,53 +98,71 @@ export class TenantsService {
   }
 
   async create(dto: CreateTenantDto, landlord: User): Promise<Tenant> {
+    // Validation ngoài transaction
     const idCardConflict = await this.tenantRepo.findOne({
-      where: { idCardNumber: dto.idCardNumber },
+      where: { idCardNumber: dto.idCardNumber, landlordId: landlord.id },
     });
     if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
 
-    if (dto.createAccount) {
-      if (!dto.email)
-        throw new BadRequestException('Cần có email để tạo tài khoản');
-      const existing = await this.userRepo.findOne({ where: { email: dto.email } });
-      if (existing) throw new ConflictException('Email đã được sử dụng');
-    }
+    if (dto.createAccount && !dto.email)
+      throw new BadRequestException('Cần có email để tạo tài khoản');
+
+    let emailJobTo: string | null = null;
+    let emailJobPassword: string | null = null;
 
     const { createAccount, ...tenantData } = dto;
-    const tenant = this.tenantRepo.create({ ...tenantData, landlordId: landlord.id });
 
-    if (createAccount) {
-      const password = AuthUtil.generateRandomPassword();
-      const passwordHash = await AuthUtil.hashPassword(password);
-      const user = this.userRepo.create({
-        email: dto.email!,
-        fullName: dto.fullName,
-        phone: dto.phone,
-        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-        gender: dto.gender ?? null,
-        passwordHash,
-        role: UserRole.TENANT,
-      });
-      const savedUser = await this.userRepo.save(user);
-      tenant.userId = savedUser.id;
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const tenant = manager.create(Tenant, { ...tenantData, landlordId: landlord.id });
 
+      if (createAccount) {
+        const existingUser = await manager.findOne(User, { where: { email: dto.email! } });
+        if (existingUser) {
+          if (existingUser.role !== UserRole.TENANT)
+            throw new ConflictException('Email đã được dùng bởi tài khoản không phải người thuê');
+          // Link account cũ — không tạo mới, không gửi email
+          tenant.userId = existingUser.id;
+        } else {
+          const password = AuthUtil.generateRandomPassword();
+          const passwordHash = await AuthUtil.hashPassword(password);
+          const user = manager.create(User, {
+            email: dto.email!,
+            fullName: dto.fullName,
+            phone: dto.phone,
+            dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+            gender: dto.gender ?? null,
+            passwordHash,
+            role: UserRole.TENANT,
+          });
+          const savedUser = await manager.save(user);
+          tenant.userId = savedUser.id;
+          emailJobTo = dto.email!;
+          emailJobPassword = password;
+        }
+      }
+
+      return manager.save(tenant);
+    });
+
+    if (emailJobTo && emailJobPassword) {
       this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
         template: MailTemplates.CREATE_USER,
-        to: dto.email!,
-        context: { email: dto.email!, password },
+        to: emailJobTo,
+        context: { email: emailJobTo, password: emailJobPassword },
       });
     }
 
-    return this.tenantRepo.save(tenant);
+    return saved;
   }
 
   async update(id: string, dto: UpdateTenantDto, landlord: User): Promise<Tenant> {
+    // Validation ngoài transaction
     const tenant = await this.findOne(id, landlord);
     const hadAccount = !!tenant.userId;
 
     if (dto.idCardNumber && dto.idCardNumber !== tenant.idCardNumber) {
       const idCardConflict = await this.tenantRepo.findOne({
-        where: { idCardNumber: dto.idCardNumber },
+        where: { idCardNumber: dto.idCardNumber, landlordId: landlord.id },
       });
       if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
     }
@@ -157,16 +173,57 @@ export class TenantsService {
         throw new ConflictException('Email đã được sử dụng');
     }
 
+    let emailJobTo: string | null = null;
+    let emailJobPassword: string | null = null;
     const { createAccount, ...tenantData } = dto;
-    Object.assign(tenant, tenantData);
-    const saved = await this.tenantRepo.save(tenant);
 
-    if (hadAccount) {
-      await this.syncToUser(tenant.userId!, dto);
-    }
+    const saved = await this.dataSource.transaction(async (manager) => {
+      Object.assign(tenant, tenantData);
+      const savedTenant = await manager.save(Tenant, tenant);
 
-    if (createAccount && !hadAccount) {
-      return this.grantAccount(saved.id, landlord);
+      if (hadAccount) {
+        await this.syncToUserWithManager(manager, tenant.userId!, dto);
+      }
+
+      if (createAccount && !hadAccount) {
+        if (!savedTenant.email)
+          throw new BadRequestException('Cần có email để tạo tài khoản');
+
+        const existingUser = await manager.findOne(User, { where: { email: savedTenant.email } });
+        if (existingUser) {
+          if (existingUser.role !== UserRole.TENANT)
+            throw new ConflictException('Email đã được dùng bởi tài khoản không phải người thuê');
+          savedTenant.userId = existingUser.id;
+          await manager.save(Tenant, savedTenant);
+        } else {
+          const password = AuthUtil.generateRandomPassword();
+          const passwordHash = await AuthUtil.hashPassword(password);
+          const user = manager.create(User, {
+            email: savedTenant.email,
+            fullName: savedTenant.fullName,
+            phone: savedTenant.phone,
+            dateOfBirth: savedTenant.dateOfBirth,
+            gender: savedTenant.gender,
+            passwordHash,
+            role: UserRole.TENANT,
+          });
+          const savedUser = await manager.save(user);
+          savedTenant.userId = savedUser.id;
+          await manager.save(Tenant, savedTenant);
+          emailJobTo = savedTenant.email;
+          emailJobPassword = password;
+        }
+      }
+
+      return savedTenant;
+    });
+
+    if (emailJobTo && emailJobPassword) {
+      this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+        template: MailTemplates.CREATE_USER,
+        to: emailJobTo,
+        context: { email: emailJobTo, password: emailJobPassword },
+      });
     }
 
     return saved;
@@ -179,47 +236,9 @@ export class TenantsService {
       where: { tenantId: id },
     });
     if (occupantCount > 0)
-      throw new BadRequestException(
-        'Không thể xóa khách thuê đã có lịch sử hợp đồng',
-      );
+      throw new BadRequestException('Không thể xóa khách thuê đã có lịch sử hợp đồng');
 
     await this.tenantRepo.remove(tenant);
-  }
-
-  private async grantAccount(id: string, landlord: User): Promise<Tenant> {
-    const tenant = await this.findOne(id, landlord);
-
-    if (tenant.userId)
-      throw new BadRequestException('Khách thuê đã có tài khoản');
-    if (!tenant.email)
-      throw new BadRequestException('Cần có email để tạo tài khoản');
-
-    const existing = await this.userRepo.findOne({ where: { email: tenant.email } });
-    if (existing) throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
-
-    const password = AuthUtil.generateRandomPassword();
-    const passwordHash = await AuthUtil.hashPassword(password);
-    const user = this.userRepo.create({
-      email: tenant.email,
-      fullName: tenant.fullName,
-      phone: tenant.phone,
-      dateOfBirth: tenant.dateOfBirth,
-      gender: tenant.gender,
-      passwordHash,
-      role: UserRole.TENANT,
-    });
-    const savedUser = await this.userRepo.save(user);
-
-    tenant.userId = savedUser.id;
-    const saved = await this.tenantRepo.save(tenant);
-
-    this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
-      template: MailTemplates.CREATE_USER,
-      to: tenant.email,
-      context: { email: tenant.email, password },
-    });
-
-    return saved;
   }
 
   async uploadIdCard(
@@ -237,8 +256,12 @@ export class TenantsService {
     return this.tenantRepo.save(tenant);
   }
 
-  private async syncToUser(userId: string, dto: UpdateTenantDto): Promise<void> {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+  private async syncToUserWithManager(
+    manager: EntityManager,
+    userId: string,
+    dto: UpdateTenantDto,
+  ): Promise<void> {
+    const user = await manager.findOne(User, { where: { id: userId } });
     if (!user) return;
 
     if (dto.fullName !== undefined) user.fullName = dto.fullName;
@@ -248,6 +271,6 @@ export class TenantsService {
       user.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
     if (dto.gender !== undefined) user.gender = dto.gender ?? null;
 
-    await this.userRepo.save(user);
+    await manager.save(user);
   }
 }
