@@ -38,7 +38,10 @@ export class TenantsService {
     private readonly uploadsService: UploadsService,
   ) {}
 
-  async findAll(dto: GetTenantsDto, landlord: User): Promise<PaginatedResult<Tenant>> {
+  async findAll(
+    dto: GetTenantsDto,
+    landlord: User,
+  ): Promise<PaginatedResult<Tenant>> {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
     const orderBy = dto.orderBy ?? 'createdAt';
@@ -86,7 +89,8 @@ export class TenantsService {
 
   async toggleActive(id: string, landlord: User): Promise<Tenant> {
     const tenant = await this.findOne(id, landlord);
-    if (!tenant.userId) throw new BadRequestException('Khách thuê chưa có tài khoản');
+    if (!tenant.userId)
+      throw new BadRequestException('Khách thuê chưa có tài khoản');
 
     const user = await this.userRepo.findOne({ where: { id: tenant.userId } });
     if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
@@ -102,7 +106,8 @@ export class TenantsService {
     const idCardConflict = await this.tenantRepo.findOne({
       where: { idCardNumber: dto.idCardNumber, landlordId: landlord.id },
     });
-    if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
+    if (idCardConflict)
+      throw new ConflictException('Số căn cước đã được sử dụng');
 
     if (dto.createAccount && !dto.email)
       throw new BadRequestException('Cần có email để tạo tài khoản');
@@ -113,32 +118,32 @@ export class TenantsService {
     const { createAccount, ...tenantData } = dto;
 
     const saved = await this.dataSource.transaction(async (manager) => {
-      const tenant = manager.create(Tenant, { ...tenantData, landlordId: landlord.id });
+      const tenant = manager.create(Tenant, {
+        ...tenantData,
+        landlordId: landlord.id,
+      });
 
       if (createAccount) {
-        const existingUser = await manager.findOne(User, { where: { email: dto.email! } });
-        if (existingUser) {
-          if (existingUser.role !== UserRole.TENANT)
-            throw new ConflictException('Email đã được dùng bởi tài khoản không phải người thuê');
-          // Link account cũ — không tạo mới, không gửi email
-          tenant.userId = existingUser.id;
-        } else {
-          const password = AuthUtil.generateRandomPassword();
-          const passwordHash = await AuthUtil.hashPassword(password);
-          const user = manager.create(User, {
-            email: dto.email!,
-            fullName: dto.fullName,
-            phone: dto.phone,
-            dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-            gender: dto.gender ?? null,
-            passwordHash,
-            role: UserRole.TENANT,
-          });
-          const savedUser = await manager.save(user);
-          tenant.userId = savedUser.id;
-          emailJobTo = dto.email!;
-          emailJobPassword = password;
-        }
+        const existingUser = await manager.findOne(User, {
+          where: { email: dto.email! },
+        });
+        if (existingUser) throw new ConflictException('Email đã được sử dụng.');
+
+        const password = AuthUtil.generateRandomPassword();
+        const passwordHash = await AuthUtil.hashPassword(password);
+        const user = manager.create(User, {
+          email: dto.email!,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+          gender: dto.gender ?? null,
+          passwordHash,
+          role: UserRole.TENANT,
+        });
+        const savedUser = await manager.save(user);
+        tenant.userId = savedUser.id;
+        emailJobTo = dto.email!;
+        emailJobPassword = password;
       }
 
       return manager.save(tenant);
@@ -155,7 +160,11 @@ export class TenantsService {
     return saved;
   }
 
-  async update(id: string, dto: UpdateTenantDto, landlord: User): Promise<Tenant> {
+  async update(
+    id: string,
+    dto: UpdateTenantDto,
+    landlord: User,
+  ): Promise<Tenant> {
     // Validation ngoài transaction
     const tenant = await this.findOne(id, landlord);
     const hadAccount = !!tenant.userId;
@@ -164,11 +173,14 @@ export class TenantsService {
       const idCardConflict = await this.tenantRepo.findOne({
         where: { idCardNumber: dto.idCardNumber, landlordId: landlord.id },
       });
-      if (idCardConflict) throw new ConflictException('Số căn cước đã được sử dụng');
+      if (idCardConflict)
+        throw new ConflictException('Số căn cước đã được sử dụng');
     }
 
     if (dto.email && dto.email !== tenant.email && tenant.userId) {
-      const conflict = await this.userRepo.findOne({ where: { email: dto.email } });
+      const conflict = await this.userRepo.findOne({
+        where: { email: dto.email },
+      });
       if (conflict && conflict.id !== tenant.userId)
         throw new ConflictException('Email đã được sử dụng');
     }
@@ -189,30 +201,28 @@ export class TenantsService {
         if (!savedTenant.email)
           throw new BadRequestException('Cần có email để tạo tài khoản');
 
-        const existingUser = await manager.findOne(User, { where: { email: savedTenant.email } });
-        if (existingUser) {
-          if (existingUser.role !== UserRole.TENANT)
-            throw new ConflictException('Email đã được dùng bởi tài khoản không phải người thuê');
-          savedTenant.userId = existingUser.id;
-          await manager.save(Tenant, savedTenant);
-        } else {
-          const password = AuthUtil.generateRandomPassword();
-          const passwordHash = await AuthUtil.hashPassword(password);
-          const user = manager.create(User, {
-            email: savedTenant.email,
-            fullName: savedTenant.fullName,
-            phone: savedTenant.phone,
-            dateOfBirth: savedTenant.dateOfBirth,
-            gender: savedTenant.gender,
-            passwordHash,
-            role: UserRole.TENANT,
-          });
-          const savedUser = await manager.save(user);
-          savedTenant.userId = savedUser.id;
-          await manager.save(Tenant, savedTenant);
-          emailJobTo = savedTenant.email;
-          emailJobPassword = password;
-        }
+        const existingUser = await manager.findOne(User, {
+          where: { email: savedTenant.email },
+        });
+        if (existingUser)
+          throw new ConflictException('Email đã được dùng bởi tài khoản khác.');
+
+        const password = AuthUtil.generateRandomPassword();
+        const passwordHash = await AuthUtil.hashPassword(password);
+        const user = manager.create(User, {
+          email: savedTenant.email,
+          fullName: savedTenant.fullName,
+          phone: savedTenant.phone,
+          dateOfBirth: savedTenant.dateOfBirth,
+          gender: savedTenant.gender,
+          passwordHash,
+          role: UserRole.TENANT,
+        });
+        const savedUser = await manager.save(user);
+        savedTenant.userId = savedUser.id;
+        await manager.save(Tenant, savedTenant);
+        emailJobTo = savedTenant.email;
+        emailJobPassword = password;
       }
 
       return savedTenant;
@@ -236,7 +246,9 @@ export class TenantsService {
       where: { tenantId: id },
     });
     if (occupantCount > 0)
-      throw new BadRequestException('Không thể xóa khách thuê đã có lịch sử hợp đồng');
+      throw new BadRequestException(
+        'Không thể xóa khách thuê đã có lịch sử hợp đồng',
+      );
 
     await this.tenantRepo.remove(tenant);
   }

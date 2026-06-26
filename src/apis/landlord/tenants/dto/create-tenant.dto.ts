@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Gender } from '@lib/common/enums';
-import { Trim } from '@lib/decorators';
+import { ToLowerCase, Trim } from '@lib/decorators';
 
 export class CreateTenantDto {
   @IsString()
@@ -19,6 +19,7 @@ export class CreateTenantDto {
   @IsOptional()
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @Trim()
+  @ToLowerCase()
   email?: string;
 
   @IsOptional()

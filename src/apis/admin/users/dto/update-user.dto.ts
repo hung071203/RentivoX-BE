@@ -9,7 +9,7 @@ import {
   Validate,
 } from 'class-validator';
 import { Gender } from '@lib/common/enums';
-import { Trim } from '@lib/decorators';
+import { ToLowerCase, Trim } from '@lib/decorators';
 import { MinAge18Constraint } from './validators';
 
 export class UpdateUserDto {
@@ -21,6 +21,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @Trim()
+  @ToLowerCase()
   email?: string;
 
   @IsOptional()
