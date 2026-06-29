@@ -5,8 +5,10 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard, RolesGuard } from '@lib/guards';
 import { CurrentUser, Roles } from '@lib/decorators';
 import { UserRole } from '@lib/common/enums';
@@ -24,6 +26,24 @@ export class PaymentsController {
   @Get()
   findAll(@Query() dto: GetPaymentsDto, @CurrentUser() user: User) {
     return this.paymentsService.findAll(dto, user);
+  }
+
+  @Get('export')
+  async exportExcel(
+    @Query() dto: GetPaymentsDto,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.paymentsService.exportExcel(dto, user);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="thanh-toan.xlsx"',
+    );
+    res.end(buffer);
   }
 
   @Get(':id')

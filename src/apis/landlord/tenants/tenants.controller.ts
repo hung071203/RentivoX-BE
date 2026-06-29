@@ -9,10 +9,12 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard, RolesGuard } from '@lib/guards';
 import { CurrentUser, Roles } from '@lib/decorators';
@@ -33,6 +35,24 @@ export class TenantsController {
   @Get()
   findAll(@Query() dto: GetTenantsDto, @CurrentUser() user: User) {
     return this.tenantsService.findAll(dto, user);
+  }
+
+  @Get('export')
+  async exportExcel(
+    @Query() dto: GetTenantsDto,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.tenantsService.exportExcel(dto, user);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="khach-thue.xlsx"',
+    );
+    res.end(buffer);
   }
 
   @Get(':id')

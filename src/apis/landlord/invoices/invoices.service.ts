@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import PDFDocument from 'pdfkit';
+import ExcelJS from 'exceljs';
 import { Invoice } from '@entities/invoice.entity';
 import { InvoiceItem } from '@entities/invoice-item.entity';
 import { Contract } from '@entities/contract.entity';
@@ -470,6 +471,128 @@ export class InvoicesService {
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
     return new Date(nextYear, nextMonth - 1, 15);
+  }
+
+  // ─── Excel export ────────────────────────────────────────────────────────────
+
+  async exportExcel(dto: GetInvoicesDto, landlord: User): Promise<Buffer> {
+    const qb = this.invoiceRepo
+      .createQueryBuilder('inv')
+      .innerJoin('inv.contract', 'c')
+      .innerJoin('c.room', 'room')
+      .innerJoin('room.property', 'property')
+      .addSelect([
+        'c.id',
+        'c.rentAmount',
+        'c.startDate',
+        'c.endDate',
+        'room.id',
+        'room.roomNumber',
+        'property.id',
+        'property.name',
+      ])
+      .where('property.landlordId = :landlordId', { landlordId: landlord.id });
+
+    if (dto.propertyId) {
+      qb.andWhere('property.id = :propertyId', { propertyId: dto.propertyId });
+    }
+    if (dto.roomId) {
+      qb.andWhere('room.id = :roomId', { roomId: dto.roomId });
+    }
+    if (dto.contractId) {
+      qb.andWhere('c.id = :contractId', { contractId: dto.contractId });
+    }
+    if (dto.status) {
+      qb.andWhere('inv.status = :status', { status: dto.status });
+    }
+    if (dto.period) {
+      qb.andWhere('inv.period = :period', { period: `${dto.period}-01` });
+    }
+
+    qb.orderBy('inv.period', OrderDirection.DESC);
+    const invoices = await qb.getMany();
+
+    // Load owner (người đại diện) cho mỗi invoice theo batch
+    const contractIds = [...new Set(invoices.map((inv) => inv.contractId))];
+    const ownerMap = new Map<string, any>();
+    if (contractIds.length > 0) {
+      const owners = await this.dataSource
+        .getRepository(RoomOccupant)
+        .createQueryBuilder('ro')
+        .innerJoin('ro.tenant', 't')
+        .addSelect(['t.id', 't.fullName', 't.phone'])
+        .where('ro.contractId IN (:...contractIds)', { contractIds })
+        .andWhere('ro.isOwner = :isOwner', { isOwner: true })
+        .getMany();
+      owners.forEach((o) => ownerMap.set(o.contractId, (o as any).tenant));
+    }
+
+    const statusLabel: Record<string, string> = {
+      unpaid: 'Chưa thanh toán',
+      paid: 'Đã thanh toán',
+      cancelled: 'Đã hủy',
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Hóa đơn');
+
+    ws.columns = [
+      { header: 'Mã HĐ', key: 'invoiceNumber', width: 20 },
+      { header: 'Kỳ', key: 'period', width: 15 },
+      { header: 'Phòng', key: 'room', width: 10 },
+      { header: 'Nhà trọ', key: 'property', width: 25 },
+      { header: 'Người đại diện', key: 'owner', width: 25 },
+      { header: 'Tổng tiền (VND)', key: 'totalAmount', width: 18 },
+      { header: 'Trạng thái', key: 'status', width: 18 },
+      { header: 'Hạn thanh toán', key: 'dueDate', width: 16 },
+      { header: 'Ngày thanh toán', key: 'paidAt', width: 16 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E7FF' },
+    };
+
+    for (const inv of invoices) {
+      const room = (inv as any).contract?.room;
+      const property = room?.property;
+      const owner = ownerMap.get(inv.contractId);
+
+      const periodStr = inv.period
+        ? this.formatPeriodForExcel(inv.period)
+        : '';
+      const dueDateStr = inv.dueDate ? this.formatDateDMY(inv.dueDate) : '';
+      const paidAtStr = inv.paidAt ? this.formatDateDMY(inv.paidAt) : '';
+
+      ws.addRow({
+        invoiceNumber: inv.invoiceNumber ?? '',
+        period: periodStr,
+        room: room?.roomNumber ?? '',
+        property: property?.name ?? '',
+        owner: owner?.fullName ?? '',
+        totalAmount: Number(inv.totalAmount),
+        status: statusLabel[inv.status] ?? inv.status,
+        dueDate: dueDateStr,
+        paidAt: paidAtStr,
+      });
+    }
+
+    ws.getColumn('totalAmount').numFmt = '#,##0';
+
+    return workbook.xlsx.writeBuffer().then((ab) => Buffer.from(ab));
+  }
+
+  private formatPeriodForExcel(period: Date | string): string {
+    const str = DateUtils.getFormatDateInTimezone(
+      new Date(period),
+      DEFAULT_TIMEZONE,
+      DateFormatEnum.YYYY_MM_DD,
+    );
+    const [year, month] = str.split('-');
+    return `Tháng ${parseInt(month)}/${year}`;
   }
 
   // ─── PDF export ──────────────────────────────────────────────────────────────

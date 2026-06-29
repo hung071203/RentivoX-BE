@@ -7,16 +7,22 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import * as ExcelJS from 'exceljs';
 import { Tenant } from '@entities/tenant.entity';
 import { User } from '@entities/user.entity';
 import { RoomOccupant } from '@entities/room-occupant.entity';
-import { UserRole } from '@lib/common/enums';
+import { Gender, UserRole } from '@lib/common/enums';
 import { AuthUtil } from '@lib/utils/auth.util';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { WorkersService } from '../../../workers/workers.service';
 import { UploadsService } from '../../../uploads/uploads.service';
 import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
 import { MailTemplates } from '@lib/common/constants/mail.constant';
+import {
+  DateFormatEnum,
+  DEFAULT_TIMEZONE,
+} from '@lib/common/constants/app.constant';
+import { DateUtils } from '@lib/utils/date.util';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { GetTenantsDto } from './dto/get-tenants.dto';
@@ -251,6 +257,83 @@ export class TenantsService {
       );
 
     await this.tenantRepo.remove(tenant);
+  }
+
+  async exportExcel(dto: GetTenantsDto, landlord: User): Promise<Buffer> {
+    const qb = this.tenantRepo
+      .createQueryBuilder('tenant')
+      .leftJoin('tenant.user', 'u')
+      .addSelect(['u.id', 'u.isActive'])
+      .where('tenant.landlordId = :landlordId', { landlordId: landlord.id });
+
+    if (dto.search) {
+      qb.andWhere(
+        '(tenant.fullName LIKE :search OR tenant.phone LIKE :search OR tenant.idCardNumber LIKE :search)',
+        { search: `%${dto.search}%` },
+      );
+    }
+    if (dto.hasAccount === true) {
+      qb.andWhere('tenant.userId IS NOT NULL');
+    } else if (dto.hasAccount === false) {
+      qb.andWhere('tenant.userId IS NULL');
+    }
+
+    qb.orderBy('tenant.createdAt', OrderDirection.DESC);
+    const tenants = await qb.getMany();
+
+    const genderLabel: Record<string, string> = {
+      [Gender.MALE]: 'Nam',
+      [Gender.FEMALE]: 'Nữ',
+      [Gender.OTHER]: 'Khác',
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Khách thuê');
+
+    ws.columns = [
+      { header: 'Họ tên', key: 'fullName', width: 25 },
+      { header: 'SĐT', key: 'phone', width: 15 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'CCCD', key: 'idCardNumber', width: 18 },
+      { header: 'Ngày sinh', key: 'dateOfBirth', width: 14 },
+      { header: 'Giới tính', key: 'gender', width: 12 },
+      { header: 'Địa chỉ thường trú', key: 'permanentAddress', width: 35 },
+      { header: 'Có tài khoản', key: 'hasAccount', width: 14 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E7FF' },
+    };
+
+    for (const t of tenants) {
+      const dobStr = t.dateOfBirth
+        ? DateUtils.getFormatDateInTimezone(
+            new Date(t.dateOfBirth),
+            DEFAULT_TIMEZONE,
+            DateFormatEnum.YYYY_MM_DD,
+          )
+            .split('-')
+            .reverse()
+            .join('/')
+        : '';
+
+      ws.addRow({
+        fullName: t.fullName ?? '',
+        phone: t.phone ?? '',
+        email: t.email ?? '',
+        idCardNumber: t.idCardNumber ?? '',
+        dateOfBirth: dobStr,
+        gender: t.gender ? (genderLabel[t.gender] ?? t.gender) : '',
+        permanentAddress: t.permanentAddress ?? '',
+        hasAccount: t.userId ? 'Có' : 'Không',
+      });
+    }
+
+    return workbook.xlsx.writeBuffer().then((ab) => Buffer.from(ab));
   }
 
   async uploadIdCard(

@@ -5,14 +5,20 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import * as ExcelJS from 'exceljs';
 import { Payment } from '@entities/payment.entity';
 import { Invoice } from '@entities/invoice.entity';
 import { User } from '@entities/user.entity';
-import { InvoiceStatus, PaymentSource } from '@lib/common/enums';
+import { InvoiceStatus, PaymentMethod, PaymentSource } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { GetPaymentsDto } from './dto/get-payments.dto';
 import { generatePaymentReferenceCode } from '@lib/helpers/app.helper';
+import {
+  DateFormatEnum,
+  DEFAULT_TIMEZONE,
+} from '@lib/common/constants/app.constant';
+import { DateUtils } from '@lib/utils/date.util';
 
 @Injectable()
 export class PaymentsService {
@@ -193,5 +199,119 @@ export class PaymentsService {
     });
 
     return this.findOne(paymentId, landlord);
+  }
+
+  async exportExcel(dto: GetPaymentsDto, landlord: User): Promise<Buffer> {
+    const qb = this.paymentRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.invoice', 'inv')
+      .innerJoin('inv.contract', 'c')
+      .innerJoin('c.room', 'room')
+      .innerJoin('room.property', 'property')
+      .leftJoin('p.recordedBy', 'recorder')
+      .addSelect([
+        'inv.id',
+        'inv.invoiceNumber',
+        'inv.period',
+        'c.id',
+        'c.contractNumber',
+        'room.id',
+        'room.roomNumber',
+        'property.id',
+        'property.name',
+        'recorder.id',
+        'recorder.fullName',
+      ])
+      .where('property.landlordId = :landlordId', { landlordId: landlord.id });
+
+    if (dto.invoiceId) {
+      qb.andWhere('inv.id = :invoiceId', { invoiceId: dto.invoiceId });
+    }
+    if (dto.propertyId) {
+      qb.andWhere('property.id = :propertyId', { propertyId: dto.propertyId });
+    }
+    if (dto.paymentMethod) {
+      qb.andWhere('p.paymentMethod = :paymentMethod', {
+        paymentMethod: dto.paymentMethod,
+      });
+    }
+    if (dto.source) {
+      qb.andWhere('p.source = :source', { source: dto.source });
+    }
+    if (dto.referenceCode) {
+      qb.andWhere('p.referenceCode LIKE :referenceCode', {
+        referenceCode: `%${dto.referenceCode}%`,
+      });
+    }
+
+    qb.orderBy('p.paymentDate', OrderDirection.DESC);
+    const payments = await qb.getMany();
+
+    const methodLabel: Record<string, string> = {
+      [PaymentMethod.CASH]: 'Tiền mặt',
+      [PaymentMethod.TRANSFER]: 'Chuyển khoản',
+      [PaymentMethod.OTHER]: 'Khác',
+    };
+    const sourceLabel: Record<string, string> = {
+      [PaymentSource.MANUAL]: 'Thủ công',
+      [PaymentSource.AUTOMATIC]: 'Tự động',
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Thanh toán');
+
+    ws.columns = [
+      { header: 'Mã TT', key: 'referenceCode', width: 22 },
+      { header: 'Mã HĐ', key: 'invoiceNumber', width: 20 },
+      { header: 'Phòng', key: 'room', width: 10 },
+      { header: 'Nhà trọ', key: 'property', width: 25 },
+      { header: 'Số tiền (VND)', key: 'amount', width: 16 },
+      { header: 'Phương thức', key: 'method', width: 16 },
+      { header: 'Nguồn', key: 'source', width: 12 },
+      { header: 'Ngày thanh toán', key: 'paymentDate', width: 17 },
+      { header: 'Người ghi nhận', key: 'recorder', width: 22 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E7FF' },
+    };
+
+    for (const p of payments) {
+      const inv = (p as any).invoice;
+      const room = (p as any).invoice?.contract?.room;
+      const property = room?.property;
+      const recorder = (p as any).recordedBy;
+
+      ws.addRow({
+        referenceCode: p.referenceCode ?? '',
+        invoiceNumber: inv?.invoiceNumber ?? '',
+        room: room?.roomNumber ?? '',
+        property: property?.name ?? '',
+        amount: Number(p.amount),
+        method: methodLabel[p.paymentMethod] ?? p.paymentMethod,
+        source: sourceLabel[p.source] ?? p.source,
+        paymentDate: p.paymentDate
+          ? this.formatDateDMY(p.paymentDate)
+          : '',
+        recorder: recorder?.fullName ?? '',
+      });
+    }
+
+    ws.getColumn('amount').numFmt = '#,##0';
+
+    return workbook.xlsx.writeBuffer().then((ab) => Buffer.from(ab));
+  }
+
+  private formatDateDMY(date: Date | string): string {
+    const str = DateUtils.getFormatDateInTimezone(
+      new Date(date),
+      DEFAULT_TIMEZONE,
+      DateFormatEnum.YYYY_MM_DD,
+    );
+    return str.split('-').reverse().join('/');
   }
 }

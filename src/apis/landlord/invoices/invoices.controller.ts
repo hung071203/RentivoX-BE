@@ -31,6 +31,21 @@ export class InvoicesController {
     return this.invoicesService.findAll(dto, user);
   }
 
+  @Get('export')
+  async exportExcel(
+    @Query() dto: GetInvoicesDto,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.invoicesService.exportExcel(dto, user);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="hoa-don.xlsx"');
+    res.end(buffer);
+  }
+
   @Get(':id/pdf')
   async exportPdf(
     @Param('id') id: string,
