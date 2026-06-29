@@ -5,6 +5,7 @@ import { InvoiceItem } from '@entities/invoice-item.entity';
 import { Contract } from '@entities/contract.entity';
 import { ContractService as ContractServiceEntity } from '@entities/contract-service.entity';
 import { MeterReading } from '@entities/meter-reading.entity';
+import { WorkersModule } from '../../../workers/workers.module';
 import { InvoicesController } from './invoices.controller';
 import { InvoicesService } from './invoices.service';
 
@@ -17,6 +18,7 @@ import { InvoicesService } from './invoices.service';
       ContractServiceEntity,
       MeterReading,
     ]),
+    WorkersModule,
   ],
   controllers: [InvoicesController],
   providers: [InvoicesService],

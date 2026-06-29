@@ -11,6 +11,16 @@ export interface OtpMailContext {
   purpose: string;
 }
 
+export interface InvoiceCreatedMailContext {
+  tenantName: string;
+  invoiceNumber: string;
+  period: string;
+  totalAmount: string;
+  dueDate: string;
+  propertyName: string;
+  roomNumber: string;
+}
+
 type BaseMailOptions = {
   to: string;
   from?: string;
@@ -28,4 +38,12 @@ export interface SendOtpMailOptions extends BaseMailOptions {
   context: OtpMailContext;
 }
 
-export type MailOptions = SendPassMailOptions | SendOtpMailOptions;
+export interface SendInvoiceCreatedMailOptions extends BaseMailOptions {
+  template: MailTemplates.INVOICE_CREATED;
+  context: InvoiceCreatedMailContext;
+}
+
+export type MailOptions =
+  | SendPassMailOptions
+  | SendOtpMailOptions
+  | SendInvoiceCreatedMailOptions;

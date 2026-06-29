@@ -1,10 +1,13 @@
+import * as fs from 'fs';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
+import PDFDocument from 'pdfkit';
 import { Invoice } from '@entities/invoice.entity';
 import { InvoiceItem } from '@entities/invoice-item.entity';
 import { Contract } from '@entities/contract.entity';
@@ -19,12 +22,17 @@ import {
   DEFAULT_TIMEZONE,
 } from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
+import { WorkersService } from '../../../workers/workers.service';
+import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
+import { MailTemplates } from '@lib/common/constants/mail.constant';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { GetInvoicesDto } from './dto/get-invoices.dto';
 import { generateInvoiceNumber } from '@lib/helpers/app.helper';
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     @InjectRepository(Invoice)
     private readonly invoiceRepo: Repository<Invoice>,
@@ -42,6 +50,7 @@ export class InvoicesService {
     private readonly meterReadingRepo: Repository<MeterReading>,
 
     private readonly dataSource: DataSource,
+    private readonly workersService: WorkersService,
   ) {}
 
   async findAll(
@@ -346,7 +355,7 @@ export class InvoicesService {
     const totalAmount = items.reduce((sum, item) => sum + item.amount!, 0);
     const dueDate = this.getDueDate(periodDate);
 
-    return this.dataSource.transaction(async (manager) => {
+    const savedInvoice = await this.dataSource.transaction(async (manager) => {
       // Sinh mã hóa đơn HD-YYYYMM-XXXX theo thứ tự trong kỳ
       const invoiceNumber = generateInvoiceNumber();
 
@@ -368,6 +377,13 @@ export class InvoicesService {
 
       return savedInvoice;
     });
+
+    // Gửi email thông báo bất đồng bộ — không block response
+    this.sendInvoiceCreatedEmail(savedInvoice, contract).catch((err) =>
+      this.logger.warn(`Không gửi được email hóa đơn: ${err?.message}`),
+    );
+
+    return savedInvoice;
   }
 
   // Dùng bởi InvoiceCron
@@ -454,5 +470,258 @@ export class InvoicesService {
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
     return new Date(nextYear, nextMonth - 1, 15);
+  }
+
+  // ─── PDF export ──────────────────────────────────────────────────────────────
+
+  async exportPdf(
+    id: string,
+    landlord: User,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const invoice = await this.findOne(id, landlord);
+    const buffer = await this.generatePdfBuffer(invoice);
+    const filename = `${invoice.invoiceNumber ?? 'hoa-don'}.pdf`;
+    return { buffer, filename };
+  }
+
+  private generatePdfBuffer(invoice: any): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c: Buffer) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const fontPath = this.getVietnameseFontPath();
+      if (fontPath) {
+        doc.registerFont('VietFont', fontPath);
+        doc.registerFont('VietFont-Bold', fontPath);
+        doc.font('VietFont');
+      }
+
+      const W = 495;
+      const X = 50;
+
+      // ── Header ──────────────────────────────────────────────────────────────
+      doc.rect(0, 0, 595, 75).fill('#4f46e5');
+      doc.fillColor('#ffffff').font(fontPath ? 'VietFont' : 'Helvetica-Bold')
+         .fontSize(20).text('RentivoX', X, 18, { lineBreak: false });
+      doc.font(fontPath ? 'VietFont' : 'Helvetica').fontSize(9)
+         .fillColor('#c7d2fe').text('He thong quan ly nha tro', X, 44);
+      doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(11)
+         .fillColor('#ffffff')
+         .text('HOA DON TIEN PHONG', X, 26, { width: W, align: 'right', lineBreak: false });
+
+      // ── Meta grid ────────────────────────────────────────────────────────────
+      let y = 95;
+      const contract = invoice.contract;
+      const room = contract?.room;
+      const property = room?.property;
+      const owner = contract?.owner;
+
+      const period = this.formatPeriod(
+        DateUtils.getFormatDateInTimezone(
+          new Date(invoice.period), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD,
+        ),
+      );
+
+      const statusLabel: Record<string, string> = {
+        unpaid: 'Chua thanh toan',
+        paid: 'Da thanh toan',
+        cancelled: 'Da huy',
+      };
+
+      const col2X = X + 250;
+
+      this.pdfLabelValue(doc, fontPath, X, y, 'Ma hoa don:', invoice.invoiceNumber ?? '—');
+      this.pdfLabelValue(doc, fontPath, col2X, y, 'Ky:', period);
+      y += 20;
+      this.pdfLabelValue(doc, fontPath, X, y, 'Trang thai:', statusLabel[invoice.status] ?? invoice.status);
+      this.pdfLabelValue(doc, fontPath, col2X, y, 'Han TT:', this.formatDateDMY(invoice.dueDate));
+      if (invoice.paidAt) {
+        y += 20;
+        this.pdfLabelValue(doc, fontPath, X, y, 'Ngay TT:', this.formatDateDMY(invoice.paidAt));
+      }
+
+      // ── Divider ─────────────────────────────────────────────────────────────
+      y += 28;
+      doc.moveTo(X, y).lineTo(X + W, y).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
+      y += 12;
+
+      // ── Property / Room / Tenant ─────────────────────────────────────────────
+      this.pdfLabelValue(doc, fontPath, X, y, 'Nha tro:', property?.name ?? '—');
+      this.pdfLabelValue(doc, fontPath, col2X, y, 'Phong:', `Phong ${room?.roomNumber ?? '—'}`);
+      y += 20;
+      if (owner) {
+        this.pdfLabelValue(doc, fontPath, X, y, 'Dai dien:', owner.fullName ?? '—');
+        this.pdfLabelValue(doc, fontPath, col2X, y, 'SDT:', owner.phone ?? '—');
+        y += 20;
+      }
+      if (contract?.startDate) {
+        const range = `${this.formatDateDMY(contract.startDate)} - ${this.formatDateDMY(contract.endDate)}`;
+        this.pdfLabelValue(doc, fontPath, X, y, 'Thoi han HĐ:', range);
+        y += 20;
+      }
+
+      // ── Divider ─────────────────────────────────────────────────────────────
+      y += 8;
+      doc.moveTo(X, y).lineTo(X + W, y).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
+      y += 14;
+
+      // ── Items table ──────────────────────────────────────────────────────────
+      doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(10)
+         .fillColor('#111827').text('Chi tiet khoan muc:', X, y);
+      y += 18;
+
+      // Table header
+      const c1 = 290, c2 = 80, c3 = 125;
+      doc.rect(X, y, W, 22).fill('#f3f4f6');
+      doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(9).fillColor('#374151');
+      doc.text('Khoan muc', X + 6, y + 6, { width: c1 - 6 });
+      doc.text('So luong', X + c1, y + 6, { width: c2, align: 'right' });
+      doc.text('Thanh tien', X + c1 + c2, y + 6, { width: c3 - 6, align: 'right' });
+      y += 22;
+
+      // Table rows
+      const items: any[] = invoice.items ?? [];
+      doc.font(fontPath ? 'VietFont' : 'Helvetica').fontSize(9).fillColor('#111827');
+      items.forEach((item: any, i: number) => {
+        if (i % 2 === 0) doc.rect(X, y, W, 20).fill('#fafafa');
+        doc.fillColor('#111827');
+        doc.text(item.description ?? '', X + 6, y + 5, { width: c1 - 6, ellipsis: true });
+        doc.text(String(Number(item.quantity)), X + c1, y + 5, { width: c2, align: 'right' });
+        doc.text(this.formatCurrencyVnd(Number(item.amount)), X + c1 + c2, y + 5, { width: c3 - 6, align: 'right' });
+        y += 20;
+      });
+
+      // Total row
+      doc.rect(X, y, W, 24).fill('#eef2ff');
+      doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(10).fillColor('#4f46e5');
+      doc.text('TONG CONG', X + 6, y + 6, { width: c1 + c2 - 6 });
+      doc.text(this.formatCurrencyVnd(Number(invoice.totalAmount)), X + c1 + c2, y + 6, { width: c3 - 6, align: 'right' });
+      y += 24;
+
+      // Table border
+      doc.rect(X, y - (22 + items.length * 20 + 24), W, 22 + items.length * 20 + 24)
+         .lineWidth(0.5).strokeColor('#d1d5db').stroke();
+
+      // ── Notes ────────────────────────────────────────────────────────────────
+      if (invoice.notes) {
+        y += 14;
+        doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(9)
+           .fillColor('#374151').text('Ghi chu:', X, y);
+        y += 14;
+        doc.font(fontPath ? 'VietFont' : 'Helvetica').fontSize(9)
+           .fillColor('#6b7280').text(invoice.notes, X, y, { width: W });
+        y += doc.heightOfString(invoice.notes, { width: W });
+      }
+
+      // ── Footer — cố định ở cuối trang, trong vùng nội dung ─────────────────
+      const footerY = doc.page.height - doc.page.margins.bottom - 28;
+      doc.moveTo(X, footerY).lineTo(X + W, footerY).lineWidth(0.5)
+         .strokeColor('#e5e7eb').stroke();
+      doc.font(fontPath ? 'VietFont' : 'Helvetica').fontSize(8)
+         .fillColor('#9ca3af')
+         .text('© 2025 RentivoX — He thong quan ly nha tro thong minh', X, footerY + 8, {
+           width: W, align: 'center',
+           lineBreak: false,
+         });
+
+      doc.end();
+    });
+  }
+
+  private pdfLabelValue(
+    doc: InstanceType<typeof PDFDocument>,
+    fontPath: string | undefined,
+    x: number,
+    y: number,
+    label: string,
+    value: string,
+  ) {
+    doc.font(fontPath ? 'VietFont' : 'Helvetica').fontSize(9)
+       .fillColor('#6b7280').text(label, x, y, { continued: false, lineBreak: false });
+    doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(9)
+       .fillColor('#111827').text(value, x + 90, y, { lineBreak: false });
+  }
+
+  // ─── Email notification ──────────────────────────────────────────────────────
+
+  private async sendInvoiceCreatedEmail(
+    invoice: Invoice,
+    contract: Contract,
+  ): Promise<void> {
+    // Lấy thông tin phòng/nhà trọ
+    const contractWithRoom = await this.contractRepo
+      .createQueryBuilder('c')
+      .innerJoin('c.room', 'room')
+      .innerJoin('room.property', 'property')
+      .addSelect(['room.id', 'room.roomNumber', 'property.id', 'property.name'])
+      .where('c.id = :id', { id: contract.id })
+      .getOne();
+
+    // Lấy email người đại diện (user.email ưu tiên, fallback tenant.email)
+    const ownerOccupant = await this.dataSource
+      .getRepository(RoomOccupant)
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 't.fullName', 't.email', 'u.id', 'u.email'])
+      .where('ro.contractId = :contractId', { contractId: contract.id })
+      .andWhere('ro.isOwner = :isOwner', { isOwner: true })
+      .getOne();
+
+    if (!ownerOccupant?.tenant) return;
+
+    const tenant = ownerOccupant.tenant as any;
+    const tenantEmail: string = tenant.user?.email ?? tenant.email;
+    if (!tenantEmail) return;
+
+    const periodStr = this.formatPeriod(
+      DateUtils.getFormatDateInTimezone(
+        new Date(invoice.period), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD,
+      ),
+    );
+
+    await this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+      to: tenantEmail,
+      template: MailTemplates.INVOICE_CREATED,
+      context: {
+        tenantName: tenant.fullName,
+        invoiceNumber: invoice.invoiceNumber,
+        period: periodStr,
+        totalAmount: this.formatCurrencyVnd(Number(invoice.totalAmount)),
+        dueDate: this.formatDateDMY(invoice.dueDate),
+        propertyName: (contractWithRoom as any)?.room?.property?.name ?? '',
+        roomNumber: (contractWithRoom as any)?.room?.roomNumber ?? '',
+      },
+    });
+  }
+
+  // ─── Private helpers ─────────────────────────────────────────────────────────
+
+  private getVietnameseFontPath(): string | undefined {
+    const candidates = [
+      'C:/Windows/Fonts/arial.ttf',
+      'C:/Windows/Fonts/Arial.ttf',
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return undefined;
+  }
+
+  private formatCurrencyVnd(amount: number): string {
+    return amount.toLocaleString('vi-VN') + ' d';
+  }
+
+  private formatDateDMY(date: Date | string): string {
+    const str = DateUtils.getFormatDateInTimezone(
+      new Date(date), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD,
+    );
+    return str.split('-').reverse().join('/');
   }
 }

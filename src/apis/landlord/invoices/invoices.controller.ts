@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard, RolesGuard } from '@lib/guards';
 import { CurrentUser, Roles } from '@lib/decorators';
 import { UserRole } from '@lib/common/enums';
@@ -27,6 +29,21 @@ export class InvoicesController {
   @Get()
   findAll(@Query() dto: GetInvoicesDto, @CurrentUser() user: User) {
     return this.invoicesService.findAll(dto, user);
+  }
+
+  @Get(':id/pdf')
+  async exportPdf(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.invoicesService.exportPdf(id, user);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Get(':id')

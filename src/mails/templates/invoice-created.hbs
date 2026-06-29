@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+          <!-- Header -->
+          <tr>
+            <td style="background:#4f46e5;padding:32px 40px">
+              <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700">RentivoX</h1>
+              <p style="margin:8px 0 0;color:#c7d2fe;font-size:13px">Hệ thống quản lý nhà trọ thông minh</p>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 40px">
+              <h2 style="margin:0 0 8px;color:#111;font-size:18px">Hóa đơn mới đã được tạo</h2>
+              <p style="margin:0 0 24px;color:#444;line-height:1.6">
+                Xin chào <strong>{{tenantName}}</strong>, hóa đơn tiền phòng {{period}} của bạn đã sẵn sàng.
+              </p>
+              <!-- Invoice summary -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f8f9;border-radius:6px;padding:20px;margin-bottom:24px">
+                <tr>
+                  <td style="padding:5px 0;color:#666;width:140px;font-size:13px">Mã hóa đơn</td>
+                  <td style="padding:5px 0;color:#111;font-weight:600;font-family:monospace;font-size:13px">{{invoiceNumber}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:5px 0;color:#666;font-size:13px">Kỳ thanh toán</td>
+                  <td style="padding:5px 0;color:#111;font-weight:600;font-size:13px">{{period}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:5px 0;color:#666;font-size:13px">Nhà trọ / Phòng</td>
+                  <td style="padding:5px 0;color:#111;font-size:13px">{{propertyName}} · Phòng {{roomNumber}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:5px 0;color:#666;font-size:13px">Hạn thanh toán</td>
+                  <td style="padding:5px 0;color:#e53e3e;font-weight:600;font-size:13px">{{dueDate}}</td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding:12px 0 0"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0" /></td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0 0;color:#111;font-weight:700;font-size:15px">Tổng cộng</td>
+                  <td style="padding:10px 0 0;color:#4f46e5;font-weight:700;font-size:18px">{{totalAmount}}</td>
+                </tr>
+              </table>
+              <p style="margin:0;color:#666;font-size:13px;line-height:1.6">
+                Vui lòng liên hệ chủ trọ để được hỗ trợ thanh toán. Nếu bạn đã thanh toán, vui lòng bỏ qua email này.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 40px;border-top:1px solid #eee;color:#999;font-size:12px">
+              © 2025 RentivoX — Hệ thống quản lý nhà trọ thông minh
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
