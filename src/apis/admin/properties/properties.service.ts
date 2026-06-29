@@ -9,7 +9,8 @@ import { GetAdminPropertiesDto } from './dto/get-admin-properties.dto';
 @Injectable()
 export class AdminPropertiesService {
   constructor(
-    @InjectRepository(Property) private readonly propertyRepo: Repository<Property>,
+    @InjectRepository(Property)
+    private readonly propertyRepo: Repository<Property>,
     @InjectRepository(Room) private readonly roomRepo: Repository<Room>,
   ) {}
 
@@ -76,7 +77,11 @@ export class AdminPropertiesService {
         province: p.province,
         createdAt: p.createdAt,
         landlord: p.landlord
-          ? { id: (p.landlord as any).id, fullName: (p.landlord as any).fullName, email: (p.landlord as any).email }
+          ? {
+              id: (p.landlord as any).id,
+              fullName: (p.landlord as any).fullName,
+              email: (p.landlord as any).email,
+            }
           : null,
         rooms: {
           total,
