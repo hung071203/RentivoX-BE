@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,8 +9,9 @@ import { DataSource, Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import { Payment } from '@entities/payment.entity';
 import { Invoice } from '@entities/invoice.entity';
+import { RoomOccupant } from '@entities/room-occupant.entity';
 import { User } from '@entities/user.entity';
-import { InvoiceStatus, PaymentMethod, PaymentSource } from '@lib/common/enums';
+import { InvoiceStatus, NotificationType, PaymentMethod, PaymentSource } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { GetPaymentsDto } from './dto/get-payments.dto';
@@ -19,9 +21,12 @@ import {
   DEFAULT_TIMEZONE,
 } from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
+import { NotificationsService } from '../../../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
@@ -30,6 +35,7 @@ export class PaymentsService {
     private readonly invoiceRepo: Repository<Invoice>,
 
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -174,6 +180,7 @@ export class PaymentsService {
       .where('p.invoiceId = :invoiceId', { invoiceId: dto.invoiceId })
       .getRawOne();
 
+    let invoicePaid = false;
     const paymentId = await this.dataSource.transaction(async (manager) => {
       const payment = manager.create(Payment, {
         invoiceId: dto.invoiceId,
@@ -193,10 +200,15 @@ export class PaymentsService {
           status: InvoiceStatus.PAID,
           paidAt: new Date(),
         });
+        invoicePaid = true;
       }
 
       return payment.id;
     });
+
+    this.sendPaymentNotifications(inv, landlord.id, invoicePaid).catch((err) =>
+      this.logger.warn(`Không gửi được thông báo thanh toán: ${err?.message}`),
+    );
 
     return this.findOne(paymentId, landlord);
   }
@@ -313,5 +325,47 @@ export class PaymentsService {
       DateFormatEnum.YYYY_MM_DD,
     );
     return str.split('-').reverse().join('/');
+  }
+
+  // ─── Notification helpers ─────────────────────────────────────────────────
+
+  private async sendPaymentNotifications(
+    invoice: Invoice,
+    landlordId: string,
+    invoicePaid: boolean,
+  ): Promise<void> {
+    // Gửi payment_recorded cho tenant owner
+    const ownerOccupant = await this.dataSource
+      .getRepository(RoomOccupant)
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 'u.id'])
+      .where('ro.contractId = :contractId', { contractId: invoice.contractId })
+      .andWhere('ro.isOwner = true')
+      .andWhere('ro.movedOutDate IS NULL')
+      .getOne();
+
+    const tenantUserId = (ownerOccupant?.tenant as any)?.user?.id as string | undefined;
+
+    if (tenantUserId) {
+      await this.notificationsService.create({
+        userId: tenantUserId,
+        type: NotificationType.PAYMENT_RECORDED,
+        title: 'Ghi nhận thanh toán',
+        message: `Hóa đơn ${invoice.invoiceNumber} đã được ghi nhận thanh toán.`,
+        data: { invoiceId: invoice.id },
+      });
+    }
+
+    if (invoicePaid) {
+      await this.notificationsService.create({
+        userId: landlordId,
+        type: NotificationType.INVOICE_PAID,
+        title: 'Hóa đơn đã thanh toán đủ',
+        message: `Hóa đơn ${invoice.invoiceNumber} đã được thanh toán đầy đủ.`,
+        data: { invoiceId: invoice.id },
+      });
+    }
   }
 }

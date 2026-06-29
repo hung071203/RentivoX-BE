@@ -15,6 +15,7 @@ import path, { join } from 'path';
 import { MailsModule } from './mails/mails.module';
 import { WorkersModule } from './workers/workers.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import {
@@ -73,6 +74,7 @@ import {
       serveStaticOptions: { index: false },
     }),
     UploadsModule,
+    NotificationsModule,
     AuthModule,
     AdminModule,
     ProfileModule,

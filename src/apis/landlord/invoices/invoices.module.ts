@@ -6,6 +6,7 @@ import { Contract } from '@entities/contract.entity';
 import { ContractService as ContractServiceEntity } from '@entities/contract-service.entity';
 import { MeterReading } from '@entities/meter-reading.entity';
 import { WorkersModule } from '../../../workers/workers.module';
+import { NotificationsModule } from '../../../notifications/notifications.module';
 import { InvoicesController } from './invoices.controller';
 import { InvoicesService } from './invoices.service';
 
@@ -19,6 +20,7 @@ import { InvoicesService } from './invoices.service';
       MeterReading,
     ]),
     WorkersModule,
+    NotificationsModule,
   ],
   controllers: [InvoicesController],
   providers: [InvoicesService],

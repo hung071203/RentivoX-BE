@@ -13,6 +13,7 @@ import { Tenant } from '@entities/tenant.entity';
 import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { Invoice } from '@entities/invoice.entity';
 import { UploadsModule } from '../../../uploads/uploads.module';
+import { NotificationsModule } from '../../../notifications/notifications.module';
 import { ContractsController } from './contracts.controller';
 import { ContractsService } from './contracts.service';
 
@@ -31,6 +32,7 @@ import { ContractsService } from './contracts.service';
       Invoice,
     ]),
     UploadsModule,
+    NotificationsModule,
     BullModule.registerQueue({ name: BullmqQueuesEnum.CONTRACT }),
   ],
   controllers: [ContractsController],

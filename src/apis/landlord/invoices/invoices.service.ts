@@ -24,8 +24,10 @@ import {
 } from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
 import { WorkersService } from '../../../workers/workers.service';
+import { NotificationsService } from '../../../notifications/notifications.service';
 import { BullmqEmailJobEnum } from '@lib/common/constants/bullmq.constant';
 import { MailTemplates } from '@lib/common/constants/mail.constant';
+import { NotificationType } from '@lib/common/enums';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { GetInvoicesDto } from './dto/get-invoices.dto';
 import { generateInvoiceNumber } from '@lib/helpers/app.helper';
@@ -52,6 +54,7 @@ export class InvoicesService {
 
     private readonly dataSource: DataSource,
     private readonly workersService: WorkersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -379,9 +382,12 @@ export class InvoicesService {
       return savedInvoice;
     });
 
-    // Gửi email thông báo bất đồng bộ — không block response
+    // Gửi email + notification bất đồng bộ — không block response
     this.sendInvoiceCreatedEmail(savedInvoice, contract).catch((err) =>
       this.logger.warn(`Không gửi được email hóa đơn: ${err?.message}`),
+    );
+    this.sendInvoiceCreatedNotification(savedInvoice, contract).catch((err) =>
+      this.logger.warn(`Không gửi được thông báo hóa đơn: ${err?.message}`),
     );
 
     return savedInvoice;
@@ -766,6 +772,42 @@ export class InvoicesService {
        .fillColor('#6b7280').text(label, x, y, { continued: false, lineBreak: false });
     doc.font(fontPath ? 'VietFont' : 'Helvetica-Bold').fontSize(9)
        .fillColor('#111827').text(value, x + 90, y, { lineBreak: false });
+  }
+
+  // ─── Notification ────────────────────────────────────────────────────────────
+
+  private async sendInvoiceCreatedNotification(
+    invoice: Invoice,
+    contract: Contract,
+  ): Promise<void> {
+    const ownerOccupant = await this.dataSource
+      .getRepository(RoomOccupant)
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 'u.id'])
+      .where('ro.contractId = :contractId', { contractId: contract.id })
+      .andWhere('ro.isOwner = :isOwner', { isOwner: true })
+      .getOne();
+
+    const tenantUserId = (ownerOccupant?.tenant as any)?.user?.id;
+    if (!tenantUserId) return;
+
+    const periodStr = this.formatPeriod(
+      DateUtils.getFormatDateInTimezone(
+        new Date(invoice.period),
+        DEFAULT_TIMEZONE,
+        DateFormatEnum.YYYY_MM_DD,
+      ),
+    );
+
+    await this.notificationsService.create({
+      userId: tenantUserId,
+      type: NotificationType.INVOICE_CREATED,
+      title: 'Hóa đơn mới',
+      message: `Hóa đơn ${invoice.invoiceNumber} kỳ ${periodStr} đã được tạo. Tổng tiền: ${this.formatCurrencyVnd(Number(invoice.totalAmount))} đ.`,
+      data: { invoiceId: invoice.id },
+    });
   }
 
   // ─── Email notification ──────────────────────────────────────────────────────

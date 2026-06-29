@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -39,6 +40,8 @@ import {
 } from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
 import { UploadsService } from '../../../uploads/uploads.service';
+import { NotificationsService } from '../../../notifications/notifications.service';
+import { NotificationType } from '@lib/common/enums';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { GetContractsDto } from './dto/get-contracts.dto';
 import { CreateAmendmentDto } from './dto/create-amendment.dto';
@@ -47,6 +50,8 @@ import { AddOccupantDto } from './dto/add-occupant.dto';
 
 @Injectable()
 export class ContractsService {
+  private readonly logger = new Logger(ContractsService.name);
+
   constructor(
     @InjectRepository(Contract)
     private readonly contractRepo: Repository<Contract>,
@@ -73,6 +78,7 @@ export class ContractsService {
     private readonly tenantRepo: Repository<Tenant>,
 
     private readonly uploadsService: UploadsService,
+    private readonly notificationsService: NotificationsService,
 
     @InjectRepository(Invoice)
     private readonly invoiceRepo: Repository<Invoice>,
@@ -517,7 +523,7 @@ export class ContractsService {
       );
 
     // --- Writes: tất cả trong 1 transaction ---
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       contract.status = ContractStatus.TERMINATED;
       contract.terminatedDate = new Date(dto.terminatedDate);
       contract.terminatedReason = (dto.terminatedReason ??
@@ -539,6 +545,12 @@ export class ContractsService {
 
       return saved;
     });
+
+    this.sendContractTerminatedNotification(result).catch((err) =>
+      this.logger.warn(`Không gửi được thông báo chấm dứt HĐ: ${err?.message}`),
+    );
+
+    return result;
   }
 
   async remove(id: string, landlord: User): Promise<void> {
@@ -727,6 +739,10 @@ export class ContractsService {
     });
     if (!amendment) return;
     await this.applyAmendment(amendment);
+
+    this.sendAmendmentAppliedNotification(amendment).catch((err) =>
+      this.logger.warn(`Không gửi được thông báo phụ lục: ${err?.message}`),
+    );
   }
 
   private async applyAmendment(amendment: ContractAmendment): Promise<void> {
@@ -784,6 +800,10 @@ export class ContractsService {
       await manager.update(Room, roomIds, { status: RoomStatus.AVAILABLE });
     });
 
+    this.sendContractExpiredNotifications(expiredContracts.map((c) => c.id)).catch(
+      (err) => this.logger.warn(`Không gửi được thông báo HĐ hết hạn: ${err?.message}`),
+    );
+
     return expiredContracts.length;
   }
 
@@ -808,5 +828,106 @@ export class ContractsService {
       throw new BadRequestException(
         'Khách thuê đang có hợp đồng hoạt động, không thể thêm vào hợp đồng khác',
       );
+  }
+
+  // ─── Notification helpers ─────────────────────────────────────────────────
+
+  private async sendContractTerminatedNotification(contract: Contract): Promise<void> {
+    const ownerOccupant = await this.roomOccupantRepo
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 't.fullName', 'u.id'])
+      .where('ro.contractId = :contractId', { contractId: contract.id })
+      .andWhere('ro.isOwner = true')
+      .getOne();
+
+    const tenantUserId = (ownerOccupant?.tenant as any)?.user?.id;
+    if (!tenantUserId) return;
+
+    await this.notificationsService.create({
+      userId: tenantUserId,
+      type: NotificationType.CONTRACT_TERMINATED,
+      title: 'Hợp đồng đã bị chấm dứt',
+      message: `Hợp đồng${contract.contractNumber ? ` ${contract.contractNumber}` : ''} đã bị chấm dứt.`,
+      data: { contractId: contract.id },
+    });
+  }
+
+  private async sendContractExpiredNotifications(contractIds: string[]): Promise<void> {
+    // Lấy thông tin landlord qua room → property
+    const contracts = await this.contractRepo
+      .createQueryBuilder('c')
+      .innerJoin('c.room', 'room')
+      .innerJoin('room.property', 'property')
+      .addSelect(['room.id', 'room.roomNumber', 'property.id', 'property.landlordId'])
+      .where('c.id IN (:...ids)', { ids: contractIds })
+      .getMany();
+
+    // Lấy owner occupant (userId) cho mỗi contract
+    const ownerOccupants = await this.roomOccupantRepo
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 'u.id'])
+      .where('ro.contractId IN (:...ids)', { ids: contractIds })
+      .andWhere('ro.isOwner = true')
+      .andWhere('ro.movedOutDate IS NULL')
+      .getMany();
+
+    const ownerMap = new Map(
+      ownerOccupants.map((ro) => [ro.contractId, (ro.tenant as any)?.user?.id as string | undefined]),
+    );
+
+    for (const contract of contracts) {
+      const room = (contract as any).room;
+      const landlordId = room?.property?.landlordId as string | undefined;
+      const tenantUserId = ownerMap.get(contract.id);
+      const roomLabel = room?.roomNumber ? `phòng ${room.roomNumber}` : '';
+      const msg = roomLabel ? `Hợp đồng ${roomLabel} đã hết hạn.` : 'Hợp đồng đã hết hạn.';
+
+      if (landlordId) {
+        await this.notificationsService.create({
+          userId: landlordId,
+          type: NotificationType.CONTRACT_EXPIRED,
+          title: 'Hợp đồng đã hết hạn',
+          message: msg,
+          data: { contractId: contract.id },
+        });
+      }
+
+      if (tenantUserId) {
+        await this.notificationsService.create({
+          userId: tenantUserId,
+          type: NotificationType.CONTRACT_EXPIRED,
+          title: 'Hợp đồng đã hết hạn',
+          message: `${msg.replace('.', '')} của bạn.`,
+          data: { contractId: contract.id },
+        });
+      }
+    }
+  }
+
+  private async sendAmendmentAppliedNotification(amendment: ContractAmendment): Promise<void> {
+    const ownerOccupant = await this.roomOccupantRepo
+      .createQueryBuilder('ro')
+      .innerJoin('ro.tenant', 't')
+      .leftJoin('t.user', 'u')
+      .addSelect(['t.id', 'u.id'])
+      .where('ro.contractId = :contractId', { contractId: amendment.contractId })
+      .andWhere('ro.isOwner = true')
+      .andWhere('ro.movedOutDate IS NULL')
+      .getOne();
+
+    const tenantUserId = (ownerOccupant?.tenant as any)?.user?.id;
+    if (!tenantUserId) return;
+
+    await this.notificationsService.create({
+      userId: tenantUserId,
+      type: NotificationType.AMENDMENT_APPLIED,
+      title: 'Phụ lục hợp đồng đã áp dụng',
+      message: `Phụ lục "${amendment.title}" đã được áp dụng vào hợp đồng của bạn.`,
+      data: { contractId: amendment.contractId, amendmentId: amendment.id },
+    });
   }
 }
