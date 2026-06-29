@@ -294,11 +294,15 @@ export class TenantsService {
       { header: 'Họ tên', key: 'fullName', width: 25 },
       { header: 'SĐT', key: 'phone', width: 15 },
       { header: 'Email', key: 'email', width: 28 },
-      { header: 'CCCD', key: 'idCardNumber', width: 18 },
       { header: 'Ngày sinh', key: 'dateOfBirth', width: 14 },
       { header: 'Giới tính', key: 'gender', width: 12 },
+      { header: 'Số CCCD/CMND', key: 'idCardNumber', width: 18 },
+      { header: 'Ngày cấp', key: 'idCardIssuedDate', width: 14 },
+      { header: 'Nơi cấp', key: 'idCardIssuedPlace', width: 30 },
       { header: 'Địa chỉ thường trú', key: 'permanentAddress', width: 35 },
       { header: 'Có tài khoản', key: 'hasAccount', width: 14 },
+      { header: 'Ảnh CCCD mặt trước', key: 'idCardFrontUrl', width: 40 },
+      { header: 'Ảnh CCCD mặt sau', key: 'idCardBackUrl', width: 40 },
     ];
 
     const headerRow = ws.getRow(1);
@@ -309,28 +313,39 @@ export class TenantsService {
       fgColor: { argb: 'FFE0E7FF' },
     };
 
-    for (const t of tenants) {
-      const dobStr = t.dateOfBirth
-        ? DateUtils.getFormatDateInTimezone(
-            new Date(t.dateOfBirth),
-            DEFAULT_TIMEZONE,
-            DateFormatEnum.YYYY_MM_DD,
-          )
-            .split('-')
-            .reverse()
-            .join('/')
-        : '';
+    const formatDate = (d: Date | string | null | undefined): string => {
+      if (!d) return '';
+      return DateUtils.getFormatDateInTimezone(new Date(d), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD)
+        .split('-')
+        .reverse()
+        .join('/');
+    };
 
+    for (const t of tenants) {
       ws.addRow({
         fullName: t.fullName ?? '',
         phone: t.phone ?? '',
         email: t.email ?? '',
-        idCardNumber: t.idCardNumber ?? '',
-        dateOfBirth: dobStr,
+        dateOfBirth: formatDate(t.dateOfBirth),
         gender: t.gender ? (genderLabel[t.gender] ?? t.gender) : '',
+        idCardNumber: t.idCardNumber ?? '',
+        idCardIssuedDate: formatDate(t.idCardIssuedDate),
+        idCardIssuedPlace: t.idCardIssuedPlace ?? '',
         permanentAddress: t.permanentAddress ?? '',
         hasAccount: t.userId ? 'Có' : 'Không',
+        idCardFrontUrl: t.idCardFrontUrl ?? '',
+        idCardBackUrl: t.idCardBackUrl ?? '',
       });
+
+      const row = ws.lastRow!;
+      if (t.idCardFrontUrl) {
+        row.getCell('idCardFrontUrl').value = { text: 'Xem ảnh', hyperlink: t.idCardFrontUrl };
+        row.getCell('idCardFrontUrl').font = { color: { argb: 'FF4F46E5' }, underline: true };
+      }
+      if (t.idCardBackUrl) {
+        row.getCell('idCardBackUrl').value = { text: 'Xem ảnh', hyperlink: t.idCardBackUrl };
+        row.getCell('idCardBackUrl').font = { color: { argb: 'FF4F46E5' }, underline: true };
+      }
     }
 
     return workbook.xlsx.writeBuffer().then((ab) => Buffer.from(ab));
