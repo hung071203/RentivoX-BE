@@ -231,36 +231,93 @@ export class DemoDataSeeder extends BaseSeeder {
     // Landlord 1: 21 tenants
     const [t1L1, t2L1, t3L1, t4L1] = await mgr.save(Tenant, [
       // real accounts
-      { userId: tu1.id, landlordId: ll1.id, fullName: 'Nguyễn Văn An', phone: '0902111001', email: 'tenant1@demo.com', idCardNumber: '001200001001', dateOfBirth: new Date('1995-03-15'), gender: Gender.MALE, permanentAddress: '123 Đường ABC, Quận 1, Hồ Chí Minh' },
-      { userId: tu2.id, landlordId: ll1.id, fullName: 'Lê Thị Bình', phone: '0902111002', email: 'tenant2@demo.com', idCardNumber: '001200001002', dateOfBirth: new Date('1997-07-20'), gender: Gender.FEMALE, permanentAddress: '456 Đường XYZ, Quận 2, Hồ Chí Minh' },
-      // shell with contract (phòng ghép C3 + TERMINATED C4)
-      { landlordId: ll1.id, fullName: 'Vũ Văn Cường', phone: '0902222001', idCardNumber: '001200002001', dateOfBirth: new Date('1996-05-10'), gender: Gender.MALE },
-      { landlordId: ll1.id, fullName: 'Nguyễn Thị Duyên', phone: '0902222002', idCardNumber: '001200002002', dateOfBirth: new Date('1994-11-25'), gender: Gender.FEMALE },
+      {
+        userId: tu1.id, landlordId: ll1.id, fullName: 'Nguyễn Văn An',
+        phone: '0902111001', email: 'tenant1@demo.com', idCardNumber: '001200001001',
+        idCardIssuedDate: new Date('2015-03-20'), idCardIssuedPlace: 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư',
+        dateOfBirth: new Date('1995-03-15'), gender: Gender.MALE,
+        permanentAddress: '123 Nguyễn Trãi, Phường Nguyễn Cư Trinh, Quận 1, Hồ Chí Minh',
+      },
+      {
+        userId: tu2.id, landlordId: ll1.id, fullName: 'Lê Thị Bình',
+        phone: '0902111002', email: 'tenant2@demo.com', idCardNumber: '001200001002',
+        idCardIssuedDate: new Date('2017-09-15'), idCardIssuedPlace: 'Công an TP. Hồ Chí Minh',
+        dateOfBirth: new Date('1997-07-20'), gender: Gender.FEMALE,
+        permanentAddress: '456 Đinh Tiên Hoàng, Phường 3, Quận Bình Thạnh, Hồ Chí Minh',
+      },
+      // shell with active contract (phòng ghép C3)
+      {
+        landlordId: ll1.id, fullName: 'Vũ Văn Cường',
+        phone: '0902222001', email: 'vu.van.cuong@test.com', idCardNumber: '001200002001',
+        idCardIssuedDate: new Date('2018-05-15'), idCardIssuedPlace: 'Công an TP. Hồ Chí Minh',
+        dateOfBirth: new Date('1996-05-10'), gender: Gender.MALE,
+        permanentAddress: '789 Phạm Văn Đồng, Phường Hiệp Bình Chánh, TP. Thủ Đức, Hồ Chí Minh',
+      },
+      // shell with terminated contract (C4)
+      {
+        landlordId: ll1.id, fullName: 'Nguyễn Thị Duyên',
+        phone: '0902222002', email: 'nguyen.thi.duyen@test.com', idCardNumber: '001200002002',
+        idCardIssuedDate: new Date('2019-08-20'), idCardIssuedPlace: 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư',
+        dateOfBirth: new Date('1994-11-25'), gender: Gender.FEMALE,
+        permanentAddress: '321 Trường Chinh, Phường 14, Quận Tân Bình, Hồ Chí Minh',
+      },
       // 17 pure shells
       ...Array.from({ length: 17 }, (_, i) => ({
         landlordId: ll1.id,
         fullName: `Khách thuê L1-${String(i + 5).padStart(2, '0')}`,
         phone: `0902${String(230000 + i).padStart(6, '0')}`,
+        email: `khachthue.l1.${String(i + 5).padStart(2, '0')}@test.com`,
         idCardNumber: `00120000${String(i + 3).padStart(4, '0')}`,
+        idCardIssuedDate: new Date('2020-06-01'),
+        idCardIssuedPlace: i % 2 === 0 ? 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư' : 'Công an TP. Hồ Chí Minh',
         dateOfBirth: new Date('1990-01-01'),
+        gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
+        permanentAddress: `${100 + i * 2} Đường Số ${i + 1}, Phường ${(i % 10) + 1}, Quận ${(i % 12) + 1}, Hồ Chí Minh`,
       })),
     ]);
 
     // Landlord 2: 21 tenants
     const [t1L2, t2L2, t3L2] = await mgr.save(Tenant, [
       // real accounts
-      { userId: tu3.id, landlordId: ll2.id, fullName: 'Phạm Văn Cường', phone: '0902111003', email: 'tenant3@demo.com', idCardNumber: '001200003001', dateOfBirth: new Date('1993-08-22'), gender: Gender.MALE, permanentAddress: '789 Đường DEF, Hoàn Kiếm, Hà Nội' },
-      { userId: tu4.id, landlordId: ll2.id, fullName: 'Hoàng Thị Dung', phone: '0902111004', email: 'tenant4@demo.com', idCardNumber: '001200003002', dateOfBirth: new Date('1998-12-05'), gender: Gender.FEMALE, permanentAddress: '321 Đường GHI, Hai Bà Trưng, Hà Nội' },
+      {
+        userId: tu3.id, landlordId: ll2.id, fullName: 'Phạm Văn Cường',
+        phone: '0902111003', email: 'tenant3@demo.com', idCardNumber: '001200003001',
+        idCardIssuedDate: new Date('2016-07-10'), idCardIssuedPlace: 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư',
+        dateOfBirth: new Date('1993-08-22'), gender: Gender.MALE,
+        permanentAddress: '789 Phố Hàng Bông, Phường Hàng Bông, Hoàn Kiếm, Hà Nội',
+      },
+      {
+        userId: tu4.id, landlordId: ll2.id, fullName: 'Hoàng Thị Dung',
+        phone: '0902111004', email: 'tenant4@demo.com', idCardNumber: '001200003002',
+        idCardIssuedDate: new Date('2018-11-22'), idCardIssuedPlace: 'Công an TP. Hà Nội',
+        dateOfBirth: new Date('1998-12-05'), gender: Gender.FEMALE,
+        permanentAddress: '321 Phố Lê Đại Hành, Phường Lê Đại Hành, Hai Bà Trưng, Hà Nội',
+      },
       // shell with expired contract (C6)
-      { landlordId: ll2.id, fullName: 'Trần Quốc Anh', phone: '0902333001', idCardNumber: '001200004001', dateOfBirth: new Date('1991-04-18'), gender: Gender.MALE },
+      {
+        landlordId: ll2.id, fullName: 'Trần Quốc Anh',
+        phone: '0902333001', email: 'tran.quoc.anh@test.com', idCardNumber: '001200004001',
+        idCardIssuedDate: new Date('2017-03-10'), idCardIssuedPlace: 'Công an TP. Hà Nội',
+        dateOfBirth: new Date('1991-04-18'), gender: Gender.MALE,
+        permanentAddress: '456 Đường Kim Mã, Phường Kim Mã, Ba Đình, Hà Nội',
+      },
       // 18 pure shells
-      ...Array.from({ length: 18 }, (_, i) => ({
-        landlordId: ll2.id,
-        fullName: `Khách thuê L2-${String(i + 4).padStart(2, '0')}`,
-        phone: `0902${String(430000 + i).padStart(6, '0')}`,
-        idCardNumber: `00120000${String(i + 20).padStart(4, '0')}`,
-        dateOfBirth: new Date('1992-01-01'),
-      })),
+      ...Array.from({ length: 18 }, (_, i) => {
+        const streets = ['Láng', 'Kim Mã', 'Hoàng Diệu', 'Trần Phú', 'Nguyễn Trãi'];
+        const districts = ['Đống Đa', 'Ba Đình', 'Hai Bà Trưng', 'Hoàn Kiếm', 'Thanh Xuân'];
+        return {
+          landlordId: ll2.id,
+          fullName: `Khách thuê L2-${String(i + 4).padStart(2, '0')}`,
+          phone: `0902${String(430000 + i).padStart(6, '0')}`,
+          email: `khachthue.l2.${String(i + 4).padStart(2, '0')}@test.com`,
+          idCardNumber: `00120000${String(i + 20).padStart(4, '0')}`,
+          idCardIssuedDate: new Date('2019-03-01'),
+          idCardIssuedPlace: i % 2 === 0 ? 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư' : 'Công an TP. Hà Nội',
+          dateOfBirth: new Date('1992-01-01'),
+          gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
+          permanentAddress: `${200 + i * 2} Phố ${streets[i % 5]}, ${districts[i % 5]}, Hà Nội`,
+        };
+      }),
     ]);
 
     // ── 10. CONTRACTS ─────────────────────────────────────────────────────

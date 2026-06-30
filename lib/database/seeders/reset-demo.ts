@@ -46,6 +46,7 @@ async function resetDemo() {
       'notifications',
       'tenants',
       'properties',
+      'seeder_versions',
     ];
 
     for (const table of tables) {
@@ -56,10 +57,6 @@ async function resetDemo() {
     // Xóa users không phải super_admin
     await qr.query(`DELETE FROM \`users\` WHERE role != 'super_admin'`);
     console.log('  Deleted: non-super_admin users');
-
-    // Xóa seeder version để có thể chạy lại
-    await qr.query(`DELETE FROM \`seeder_versions\` WHERE name = '002-demo-data'`);
-    console.log('  Deleted: seeder version 002-demo-data');
 
     await qr.query('SET FOREIGN_KEY_CHECKS = 1');
 
