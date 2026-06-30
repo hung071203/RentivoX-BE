@@ -805,7 +805,7 @@ export class InvoicesService {
       userId: tenantUserId,
       type: NotificationType.INVOICE_CREATED,
       title: 'Hóa đơn mới',
-      message: `Hóa đơn ${invoice.invoiceNumber} kỳ ${periodStr} đã được tạo. Tổng tiền: ${this.formatCurrencyVnd(Number(invoice.totalAmount))} đ.`,
+      message: `Hóa đơn ${invoice.invoiceNumber} kỳ ${periodStr} đã được tạo. Tổng tiền: ${this.formatCurrencyVnd(Number(invoice.totalAmount))}.`,
       data: { invoiceId: invoice.id },
     });
   }
@@ -880,7 +880,7 @@ export class InvoicesService {
   }
 
   private formatCurrencyVnd(amount: number): string {
-    return amount.toLocaleString('vi-VN') + ' d';
+    return amount.toLocaleString('vi-VN') + ' VND';
   }
 
   private formatDateDMY(date: Date | string): string {
