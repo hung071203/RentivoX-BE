@@ -46,8 +46,8 @@ export class DemoDataSeeder extends BaseSeeder {
 
     // ── 2. REAL LANDLORD USERS ────────────────────────────────────────────
     const [ll1, ll2] = await mgr.save(User, [
-      { email: 'landlord1@demo.com', passwordHash: pw, role: UserRole.LANDLORD, fullName: 'Nguyễn Minh Khoa', phone: '0901111001', gender: Gender.MALE, isActive: true },
-      { email: 'landlord2@demo.com', passwordHash: pw, role: UserRole.LANDLORD, fullName: 'Trần Thị Lan', phone: '0901111002', gender: Gender.FEMALE, isActive: true },
+      { email: 'landlord1@demo.com', passwordHash: pw, role: UserRole.LANDLORD, fullName: 'Nguyễn Minh Khoa', phone: '0901111001', dateOfBirth: new Date('1980-05-15'), gender: Gender.MALE, isActive: true },
+      { email: 'landlord2@demo.com', passwordHash: pw, role: UserRole.LANDLORD, fullName: 'Trần Thị Lan', phone: '0901111002', dateOfBirth: new Date('1975-11-22'), gender: Gender.FEMALE, isActive: true },
     ]);
 
     // ── 3. SHELL LANDLORD USERS (19) ──────────────────────────────────────
@@ -65,16 +65,19 @@ export class DemoDataSeeder extends BaseSeeder {
         passwordHash: pw,
         role: UserRole.LANDLORD,
         fullName,
+        phone: `0901${String(200000 + i).padStart(6, '0')}`,
+        dateOfBirth: new Date(`${1965 + (i % 20)}-${String((i % 12) + 1).padStart(2, '0')}-15`),
+        gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
         isActive: true,
       })),
     );
 
     // ── 4. TENANT USERS (4 real) ──────────────────────────────────────────
     const [tu1, tu2, tu3, tu4] = await mgr.save(User, [
-      { email: 'tenant1@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Nguyễn Văn An', phone: '0902111001', gender: Gender.MALE, isActive: true },
-      { email: 'tenant2@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Lê Thị Bình', phone: '0902111002', gender: Gender.FEMALE, isActive: true },
-      { email: 'tenant3@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Phạm Văn Cường', phone: '0902111003', gender: Gender.MALE, isActive: true },
-      { email: 'tenant4@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Hoàng Thị Dung', phone: '0902111004', gender: Gender.FEMALE, isActive: true },
+      { email: 'tenant1@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Nguyễn Văn An', phone: '0902111001', dateOfBirth: new Date('1995-03-15'), gender: Gender.MALE, isActive: true },
+      { email: 'tenant2@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Lê Thị Bình', phone: '0902111002', dateOfBirth: new Date('1997-07-20'), gender: Gender.FEMALE, isActive: true },
+      { email: 'tenant3@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Phạm Văn Cường', phone: '0902111003', dateOfBirth: new Date('1993-08-22'), gender: Gender.MALE, isActive: true },
+      { email: 'tenant4@demo.com', passwordHash: pw, role: UserRole.TENANT, fullName: 'Hoàng Thị Dung', phone: '0902111004', dateOfBirth: new Date('1998-12-05'), gender: Gender.FEMALE, isActive: true },
     ]);
 
     // ── 5. PROPERTIES ─────────────────────────────────────────────────────
