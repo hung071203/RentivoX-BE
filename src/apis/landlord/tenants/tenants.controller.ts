@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,16 +12,17 @@ import {
   Query,
   Res,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard, RolesGuard } from '@lib/guards';
 import { CurrentUser, Roles } from '@lib/decorators';
 import { UserRole } from '@lib/common/enums';
 import { User } from '@entities/user.entity';
-import { multerConfig } from '@lib/configs/multer.config';
+import { multerConfig, multerMemoryConfig } from '@lib/configs/multer.config';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -60,9 +62,42 @@ export class TenantsController {
     return this.tenantsService.findOne(id, user);
   }
 
+  @Post('scan-id-card')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'front', maxCount: 1 },
+        { name: 'back', maxCount: 1 },
+      ],
+      multerMemoryConfig('image'),
+    ),
+  )
+  scanIdCard(
+    @UploadedFiles() files: { front?: Express.Multer.File[]; back?: Express.Multer.File[] },
+  ) {
+    const frontFile = files?.front?.[0];
+    const backFile = files?.back?.[0];
+    if (!frontFile || !backFile)
+      throw new BadRequestException('Cần cung cấp cả 2 ảnh CCCD (front + back)');
+    return this.tenantsService.scanIdCard(frontFile, backFile);
+  }
+
   @Post()
-  create(@Body() dto: CreateTenantDto, @CurrentUser() user: User) {
-    return this.tenantsService.create(dto, user);
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'idCardFront', maxCount: 1 },
+        { name: 'idCardBack', maxCount: 1 },
+      ],
+      multerConfig('id-cards', 'image'),
+    ),
+  )
+  create(
+    @Body() dto: CreateTenantDto,
+    @CurrentUser() user: User,
+    @UploadedFiles() files?: { idCardFront?: Express.Multer.File[]; idCardBack?: Express.Multer.File[] },
+  ) {
+    return this.tenantsService.create(dto, user, files);
   }
 
   @Patch(':id')

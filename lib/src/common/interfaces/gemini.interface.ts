@@ -4,7 +4,8 @@ export interface GeminiOrcIdentifyImageResponse {
   front_side: {
     id_number: string;
     full_name: string;
-    gender?: Gender;
+    date_of_birth?: string;
+    gender?: string;
     nationality?: string;
     place_of_origin?: string;
     place_of_residence?: string;
@@ -16,6 +17,16 @@ export interface GeminiOrcIdentifyImageResponse {
     issue_authority?: string;
     issue_date?: string;
   };
+}
+
+export interface ScanIdCardResult {
+  idCardNumber?: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  permanentAddress?: string;
+  idCardIssuedDate?: string;
+  idCardIssuedPlace?: string;
 }
 
 export interface GeminiRunInteractionResponse {

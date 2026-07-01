@@ -23,9 +23,29 @@ import {
   DEFAULT_TIMEZONE,
 } from '@lib/common/constants/app.constant';
 import { DateUtils } from '@lib/utils/date.util';
+import { GeminiService } from '@lib/services/gemini.service';
+import { ScanIdCardResult } from '@lib/common/interfaces/gemini.interface';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { GetTenantsDto } from './dto/get-tenants.dto';
+
+function parseViDate(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const match = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return undefined;
+}
+
+function mapGender(raw: string | null | undefined): Gender | undefined {
+  if (!raw) return undefined;
+  const v = raw.toLowerCase().trim();
+  if (v === 'male' || v === 'nam') return Gender.MALE;
+  if (v === 'female' || v === 'nữ' || v === 'nu') return Gender.FEMALE;
+  return Gender.OTHER;
+}
 
 @Injectable()
 export class TenantsService {
@@ -42,7 +62,29 @@ export class TenantsService {
     private readonly dataSource: DataSource,
     private readonly workersService: WorkersService,
     private readonly uploadsService: UploadsService,
+    private readonly geminiService: GeminiService,
   ) {}
+
+  async scanIdCard(
+    frontFile: Express.Multer.File,
+    backFile: Express.Multer.File,
+  ): Promise<ScanIdCardResult> {
+    const toBase64 = (f: Express.Multer.File) => f.buffer.toString('base64');
+    const ocr = await this.geminiService.orcIdentifyImage(
+      toBase64(frontFile),
+      toBase64(backFile),
+    );
+
+    return {
+      idCardNumber: ocr.front_side.id_number ?? undefined,
+      fullName: ocr.front_side.full_name ?? undefined,
+      dateOfBirth: parseViDate(ocr.front_side.date_of_birth),
+      gender: mapGender(ocr.front_side.gender),
+      permanentAddress: ocr.front_side.place_of_residence ?? undefined,
+      idCardIssuedDate: parseViDate(ocr.back_side.issue_date),
+      idCardIssuedPlace: ocr.back_side.issue_authority ?? undefined,
+    };
+  }
 
   async findAll(
     dto: GetTenantsDto,
@@ -107,8 +149,14 @@ export class TenantsService {
     return this.findOne(id, landlord);
   }
 
-  async create(dto: CreateTenantDto, landlord: User): Promise<Tenant> {
-    // Validation ngoài transaction
+  async create(
+    dto: CreateTenantDto,
+    landlord: User,
+    files?: { idCardFront?: Express.Multer.File[]; idCardBack?: Express.Multer.File[] },
+  ): Promise<Tenant> {
+    const frontFile = files?.idCardFront?.[0];
+    const backFile = files?.idCardBack?.[0];
+
     const idCardConflict = await this.tenantRepo.findOne({
       where: { idCardNumber: dto.idCardNumber, landlordId: landlord.id },
     });
@@ -120,40 +168,58 @@ export class TenantsService {
 
     let emailJobTo: string | null = null;
     let emailJobPassword: string | null = null;
-
     const { createAccount, ...tenantData } = dto;
 
-    const saved = await this.dataSource.transaction(async (manager) => {
-      const tenant = manager.create(Tenant, {
-        ...tenantData,
-        landlordId: landlord.id,
+    let saved: Tenant;
+    try {
+      saved = await this.dataSource.transaction(async (manager) => {
+        const tenant = manager.create(Tenant, {
+          ...tenantData,
+          landlordId: landlord.id,
+          ...(frontFile && {
+            idCardFrontUrl: this.uploadsService.getFileUrl('id-cards', frontFile.filename),
+          }),
+          ...(backFile && {
+            idCardBackUrl: this.uploadsService.getFileUrl('id-cards', backFile.filename),
+          }),
+        });
+
+        if (createAccount) {
+          const existingUser = await manager.findOne(User, {
+            where: { email: dto.email! },
+          });
+          if (existingUser) throw new ConflictException('Email đã được sử dụng.');
+
+          const password = AuthUtil.generateRandomPassword();
+          const passwordHash = await AuthUtil.hashPassword(password);
+          const user = manager.create(User, {
+            email: dto.email!,
+            fullName: dto.fullName,
+            phone: dto.phone,
+            dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
+            gender: dto.gender ?? null,
+            passwordHash,
+            role: UserRole.TENANT,
+          });
+          const savedUser = await manager.save(user);
+          tenant.userId = savedUser.id;
+          emailJobTo = dto.email!;
+          emailJobPassword = password;
+        }
+
+        return manager.save(tenant);
       });
-
-      if (createAccount) {
-        const existingUser = await manager.findOne(User, {
-          where: { email: dto.email! },
-        });
-        if (existingUser) throw new ConflictException('Email đã được sử dụng.');
-
-        const password = AuthUtil.generateRandomPassword();
-        const passwordHash = await AuthUtil.hashPassword(password);
-        const user = manager.create(User, {
-          email: dto.email!,
-          fullName: dto.fullName,
-          phone: dto.phone,
-          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
-          gender: dto.gender ?? null,
-          passwordHash,
-          role: UserRole.TENANT,
-        });
-        const savedUser = await manager.save(user);
-        tenant.userId = savedUser.id;
-        emailJobTo = dto.email!;
-        emailJobPassword = password;
-      }
-
-      return manager.save(tenant);
-    });
+    } catch (error) {
+      if (frontFile)
+        await this.uploadsService.deleteFile(
+          this.uploadsService.getFileUrl('id-cards', frontFile.filename),
+        );
+      if (backFile)
+        await this.uploadsService.deleteFile(
+          this.uploadsService.getFileUrl('id-cards', backFile.filename),
+        );
+      throw error;
+    }
 
     if (emailJobTo && emailJobPassword) {
       this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {

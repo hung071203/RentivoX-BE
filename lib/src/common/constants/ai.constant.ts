@@ -52,6 +52,10 @@ export const GEMINI_RESPONSE_SCHEMA = {
             type: 'string',
             description: 'Place of residence (Nơi thường trú)',
           },
+          date_of_birth: {
+            type: 'string',
+            description: 'Date of birth (Ngày sinh) in DD/MM/YYYY format',
+          },
           valid_until: {
             type: 'string',
             description: 'Card expiration date (Có giá trị đến)',
