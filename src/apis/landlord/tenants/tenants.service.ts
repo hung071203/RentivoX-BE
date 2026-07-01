@@ -70,20 +70,30 @@ export class TenantsService {
     backFile: Express.Multer.File,
   ): Promise<ScanIdCardResult> {
     const toBase64 = (f: Express.Multer.File) => f.buffer.toString('base64');
-    const ocr = await this.geminiService.orcIdentifyImage(
-      toBase64(frontFile),
-      toBase64(backFile),
-    );
+    try {
+      const ocr = await this.geminiService.orcIdentifyImage(
+        toBase64(frontFile),
+        toBase64(backFile),
+      );
 
-    return {
-      idCardNumber: ocr.front_side.id_number ?? undefined,
-      fullName: ocr.front_side.full_name ?? undefined,
-      dateOfBirth: parseViDate(ocr.front_side.date_of_birth),
-      gender: mapGender(ocr.front_side.gender),
-      permanentAddress: ocr.front_side.place_of_residence ?? undefined,
-      idCardIssuedDate: parseViDate(ocr.back_side.issue_date),
-      idCardIssuedPlace: ocr.back_side.issue_authority ?? undefined,
-    };
+      if (!ocr.success) {
+        throw new Error('OCR failed');
+      }
+
+      return {
+        idCardNumber: ocr.front_side.id_number ?? undefined,
+        fullName: ocr.front_side.full_name ?? undefined,
+        dateOfBirth: parseViDate(ocr.front_side.date_of_birth),
+        gender: mapGender(ocr.front_side.gender),
+        permanentAddress: ocr.front_side.place_of_residence ?? undefined,
+        idCardIssuedDate: parseViDate(ocr.back_side.issue_date),
+        idCardIssuedPlace: ocr.back_side.issue_authority ?? undefined,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        'Không thể nhận diện thông tin từ ảnh CCCD. Vui lòng thử lại hoặc nhập thủ công.',
+      );
+    }
   }
 
   async findAll(
@@ -152,7 +162,10 @@ export class TenantsService {
   async create(
     dto: CreateTenantDto,
     landlord: User,
-    files?: { idCardFront?: Express.Multer.File[]; idCardBack?: Express.Multer.File[] },
+    files?: {
+      idCardFront?: Express.Multer.File[];
+      idCardBack?: Express.Multer.File[];
+    },
   ): Promise<Tenant> {
     const frontFile = files?.idCardFront?.[0];
     const backFile = files?.idCardBack?.[0];
@@ -177,10 +190,16 @@ export class TenantsService {
           ...tenantData,
           landlordId: landlord.id,
           ...(frontFile && {
-            idCardFrontUrl: this.uploadsService.getFileUrl('id-cards', frontFile.filename),
+            idCardFrontUrl: this.uploadsService.getFileUrl(
+              'id-cards',
+              frontFile.filename,
+            ),
           }),
           ...(backFile && {
-            idCardBackUrl: this.uploadsService.getFileUrl('id-cards', backFile.filename),
+            idCardBackUrl: this.uploadsService.getFileUrl(
+              'id-cards',
+              backFile.filename,
+            ),
           }),
         });
 
@@ -188,7 +207,8 @@ export class TenantsService {
           const existingUser = await manager.findOne(User, {
             where: { email: dto.email! },
           });
-          if (existingUser) throw new ConflictException('Email đã được sử dụng.');
+          if (existingUser)
+            throw new ConflictException('Email đã được sử dụng.');
 
           const password = AuthUtil.generateRandomPassword();
           const passwordHash = await AuthUtil.hashPassword(password);
@@ -381,7 +401,11 @@ export class TenantsService {
 
     const formatDate = (d: Date | string | null | undefined): string => {
       if (!d) return '';
-      return DateUtils.getFormatDateInTimezone(new Date(d), DEFAULT_TIMEZONE, DateFormatEnum.YYYY_MM_DD)
+      return DateUtils.getFormatDateInTimezone(
+        new Date(d),
+        DEFAULT_TIMEZONE,
+        DateFormatEnum.YYYY_MM_DD,
+      )
         .split('-')
         .reverse()
         .join('/');
@@ -405,12 +429,24 @@ export class TenantsService {
 
       const row = ws.lastRow!;
       if (t.idCardFrontUrl) {
-        row.getCell('idCardFrontUrl').value = { text: 'Xem ảnh', hyperlink: t.idCardFrontUrl };
-        row.getCell('idCardFrontUrl').font = { color: { argb: 'FF4F46E5' }, underline: true };
+        row.getCell('idCardFrontUrl').value = {
+          text: 'Xem ảnh',
+          hyperlink: t.idCardFrontUrl,
+        };
+        row.getCell('idCardFrontUrl').font = {
+          color: { argb: 'FF4F46E5' },
+          underline: true,
+        };
       }
       if (t.idCardBackUrl) {
-        row.getCell('idCardBackUrl').value = { text: 'Xem ảnh', hyperlink: t.idCardBackUrl };
-        row.getCell('idCardBackUrl').font = { color: { argb: 'FF4F46E5' }, underline: true };
+        row.getCell('idCardBackUrl').value = {
+          text: 'Xem ảnh',
+          hyperlink: t.idCardBackUrl,
+        };
+        row.getCell('idCardBackUrl').font = {
+          color: { argb: 'FF4F46E5' },
+          underline: true,
+        };
       }
     }
 

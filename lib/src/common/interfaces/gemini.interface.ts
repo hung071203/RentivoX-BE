@@ -1,6 +1,7 @@
 import { Gender } from '../enums';
 
 export interface GeminiOrcIdentifyImageResponse {
+  success: boolean;
   front_side: {
     id_number: string;
     full_name: string;

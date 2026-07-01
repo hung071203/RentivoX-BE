@@ -14,13 +14,18 @@ Requirements:
 3. If a field is missing or unreadable, return null.
 4. Return only valid JSON without explanations.
 5. Identify which information belongs to the front side and which belongs to the back side.
-`,
+6. Verify that the uploaded image is a Vietnamese Citizen Identity Card (CCCD). If the image is not a CCCD, return a JSON response with: "success": false`,
 };
 
 export const GEMINI_RESPONSE_SCHEMA = {
   ORC_IDENTIFY_IMAGE: {
     type: 'object',
     properties: {
+      success: {
+        type: 'boolean',
+        description:
+          'Indicates whether the image is a valid Vietnamese Citizen Identity Card (CCCD)',
+      },
       front_side: {
         type: 'object',
         properties: {
@@ -82,7 +87,7 @@ export const GEMINI_RESPONSE_SCHEMA = {
         },
       },
     },
-    required: ['front_side', 'back_side'],
+    required: ['success', 'front_side', 'back_side'],
   },
 };
 
