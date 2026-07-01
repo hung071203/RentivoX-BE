@@ -22,6 +22,7 @@
     "seed:reset": "ts-node --project tsconfig.seeder.json -r tsconfig-paths/register lib/database/seeders/reset-demo.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.10.0",
     "@nestjs-modules/mailer": "^2.3.6",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",

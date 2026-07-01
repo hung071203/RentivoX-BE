@@ -31,6 +31,8 @@ const schema = Joi.object({
   MAIL_USER: Joi.string().required(),
   MAIL_PASS: Joi.string().required(),
   MAIL_FROM: Joi.string().required(),
+
+  GOOGLE_API_KEY: Joi.string().required(),
 }).unknown(true);
 
 const { error, value } = schema.validate(process.env);
@@ -70,4 +72,6 @@ export const ENV = {
     pass: value.MAIL_PASS as string,
     from: value.MAIL_FROM as string,
   },
+
+  googleApiKey: value.GOOGLE_API_KEY as string,
 };
