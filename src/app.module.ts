@@ -16,6 +16,7 @@ import { MailsModule } from './mails/mails.module';
 import { WorkersModule } from './workers/workers.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChatModule } from './apis/chat/chat.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import {
@@ -75,6 +76,7 @@ import {
     }),
     UploadsModule,
     NotificationsModule,
+    ChatModule,
     AuthModule,
     AdminModule,
     ProfileModule,
