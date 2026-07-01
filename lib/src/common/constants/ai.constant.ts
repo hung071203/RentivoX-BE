@@ -14,7 +14,7 @@ Requirements:
 3. If a field is missing or unreadable, return null.
 4. Return only valid JSON without explanations.
 5. Identify which information belongs to the front side and which belongs to the back side.
-6. Verify that the uploaded image is a Vietnamese Citizen Identity Card (CCCD). If the image is not a CCCD, return a JSON response with: "success": false`,
+6. Verify that both uploaded images are genuine Vietnamese Citizen Identity Card (CCCD) images. The front image must be the front side of a CCCD, and the back image must be the back side of a CCCD. If either image is not a CCCD, is the wrong side, is a different document type, or cannot be confidently identified as a CCCD, return: "success": false`,
 };
 
 export const GEMINI_RESPONSE_SCHEMA = {
