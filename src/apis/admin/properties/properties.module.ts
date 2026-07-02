@@ -9,5 +9,6 @@ import { AdminPropertiesService } from './properties.service';
   imports: [TypeOrmModule.forFeature([Property, Room])],
   controllers: [AdminPropertiesController],
   providers: [AdminPropertiesService],
+  exports: [AdminPropertiesService],
 })
 export class AdminPropertiesModule {}

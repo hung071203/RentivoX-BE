@@ -1,6 +1,7 @@
 import { ToolAIService } from '@lib/services/tool-ai.service';
 import { UserRole } from '../enums';
 import { GeminiTool_2 } from '../interfaces/gemini.interface';
+import { PAGE_TOPICS } from './page-links.constant';
 
 export const AI_PROMPT = {
   ORC_IDENTIFY_IMAGE: `
@@ -109,11 +110,110 @@ export const BASE_TOOLS: GeminiTool_2[] = [
       required: [],
     },
   },
+  {
+    type: 'function',
+    name: AI_SV_PROTOTYPE.getFrontendPageLink.name,
+    description:
+      'Lấy đường dẫn (route) trang trên giao diện web tương ứng với 1 tính năng, để hướng dẫn người dùng điều hướng đến đúng trang khi họ không biết vào đâu. Chỉ trả về trang phù hợp với vai trò hiện tại của người dùng.',
+    parameters: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'Chủ đề/tính năng người dùng muốn tìm trang tương ứng',
+          enum: PAGE_TOPICS,
+        },
+      },
+      required: ['topic'],
+    },
+  },
+];
+
+// Tools chỉ đọc (read-only) dùng chung cho Admin + Super Admin
+export const ADMIN_TOOLS: GeminiTool_2[] = [
+  {
+    type: 'function',
+    name: AI_SV_PROTOTYPE.getSystemOverview.name,
+    description:
+      'Xem thống kê tổng quan toàn hệ thống: tổng số chủ trọ, người thuê, nhà trọ, phòng, tỷ lệ lấp đầy và top 5 chủ trọ có nhiều phòng nhất.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: AI_SV_PROTOTYPE.searchUsers.name,
+    description:
+      'Tìm kiếm/liệt kê tài khoản admin hoặc chủ trọ theo tên, email, vai trò, trạng thái hoạt động. Dùng để tra cứu thông tin hoặc lấy userId trước khi xem chi tiết.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Tìm theo tên hoặc email',
+        },
+        role: {
+          type: 'string',
+          description: 'Lọc theo vai trò',
+          enum: ['admin', 'landlord'],
+        },
+        isActive: {
+          type: 'boolean',
+          description: 'Lọc theo trạng thái hoạt động (true = đang hoạt động)',
+        },
+        page: { type: 'integer', description: 'Số trang, mặc định 1' },
+        limit: {
+          type: 'integer',
+          description: 'Số kết quả mỗi trang, mặc định 20, tối đa 100',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: AI_SV_PROTOTYPE.getUserDetail.name,
+    description: 'Xem chi tiết thông tin 1 tài khoản (admin hoặc chủ trọ) theo id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'ID của tài khoản cần xem' },
+      },
+      required: ['userId'],
+    },
+  },
+  {
+    type: 'function',
+    name: AI_SV_PROTOTYPE.listProperties.name,
+    description:
+      'Xem danh sách nhà trọ trong toàn hệ thống, có thể lọc theo tên/địa chỉ hoặc theo chủ trọ.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Tìm theo tên nhà trọ hoặc địa chỉ',
+        },
+        landlordId: {
+          type: 'string',
+          description: 'Lọc theo id chủ trọ sở hữu',
+        },
+        page: { type: 'integer', description: 'Số trang, mặc định 1' },
+        limit: {
+          type: 'integer',
+          description: 'Số kết quả mỗi trang, mặc định 20, tối đa 100',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 export const GEMINI_TOOLS = {
-  [UserRole.SUPER_ADMIN]: [...BASE_TOOLS],
-  [UserRole.ADMIN]: [...BASE_TOOLS],
+  [UserRole.SUPER_ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
+  [UserRole.ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
   [UserRole.LANDLORD]: [...BASE_TOOLS],
   [UserRole.TENANT]: [...BASE_TOOLS],
 };

@@ -17,6 +17,7 @@ const schema = Joi.object({
   ADMIN_PASSWORD: Joi.string().min(6).required(),
 
   APP_URL: Joi.string().default('http://localhost:3000'),
+  FE_URL: Joi.string().default('http://localhost:3001'),
   CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
 
   JWT_SECRET: Joi.string().required(),
@@ -51,6 +52,7 @@ export const ENV = {
     name: value.DB_NAME as string,
   },
   appUrl: value.APP_URL as string,
+  frontendUrl: value.FE_URL as string,
   corsOrigin: value.CORS_ORIGIN as string,
   jwt: {
     secret: value.JWT_SECRET as string,
