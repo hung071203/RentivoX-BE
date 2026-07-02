@@ -35,6 +35,7 @@ import {
       username: ENV.db.username,
       password: ENV.db.password,
       database: ENV.db.name,
+      timezone: 'Z',
       entities: [__dirname + '/../lib/database/entities/**/*.entity{.ts,.js}'],
       synchronize: ENV.nodeEnv === 'development',
       logging: ENV.nodeEnv === 'development',

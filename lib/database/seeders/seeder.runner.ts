@@ -10,6 +10,7 @@ const AppDataSource = new DataSource({
   username: ENV.db.username,
   password: ENV.db.password,
   database: ENV.db.name,
+  timezone: 'Z',
   entities: [__dirname + '/../entities/**/*.entity{.ts,.js}'],
   synchronize: true,
 });
