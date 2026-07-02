@@ -112,8 +112,8 @@ export const BASE_TOOLS: GeminiTool_2[] = [
 ];
 
 export const GEMINI_TOOLS = {
-  [UserRole.SUPER_ADMIN]: BASE_TOOLS,
-  [UserRole.ADMIN]: BASE_TOOLS,
-  [UserRole.LANDLORD]: BASE_TOOLS,
-  [UserRole.TENANT]: BASE_TOOLS,
+  [UserRole.SUPER_ADMIN]: [...BASE_TOOLS],
+  [UserRole.ADMIN]: [...BASE_TOOLS],
+  [UserRole.LANDLORD]: [...BASE_TOOLS],
+  [UserRole.TENANT]: [...BASE_TOOLS],
 };
