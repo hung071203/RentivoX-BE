@@ -11,7 +11,7 @@ import {
   UserRole,
 } from '@lib/common/enums';
 import { DateUtils } from '@lib/utils/date.util';
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { UsersService } from '../../../src/apis/admin/users/users.service';
 import { DashboardService } from '../../../src/apis/admin/dashboard/dashboard.service';
 import { AdminPropertiesService } from '../../../src/apis/admin/properties/properties.service';
@@ -22,14 +22,17 @@ import { TenantsService } from '../../../src/apis/landlord/tenants/tenants.servi
 import { ContractsService } from '../../../src/apis/landlord/contracts/contracts.service';
 import { InvoicesService } from '../../../src/apis/landlord/invoices/invoices.service';
 import { PaymentsService } from '../../../src/apis/landlord/payments/payments.service';
+import { DashboardService as TenantDashboardService } from '../../../src/apis/tenant/dashboard/dashboard.service';
+import { RoomService as TenantRoomService } from '../../../src/apis/tenant/room/room.service';
+import { ContractsService as TenantContractsService } from '../../../src/apis/tenant/contracts/contracts.service';
+import { InvoicesService as TenantInvoicesService } from '../../../src/apis/tenant/invoices/invoices.service';
+import { PaymentsService as TenantPaymentsService } from '../../../src/apis/tenant/payments/payments.service';
 import { ENV } from '@lib/configs/env.config';
 
 const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 
 @Injectable()
 export class ToolAIService {
-  private readonly logger = new Logger(ToolAIService.name);
-
   constructor(
     private readonly usersService: UsersService,
     private readonly dashboardService: DashboardService,
@@ -41,6 +44,11 @@ export class ToolAIService {
     private readonly contractsService: ContractsService,
     private readonly invoicesService: InvoicesService,
     private readonly paymentsService: PaymentsService,
+    private readonly tenantDashboardService: TenantDashboardService,
+    private readonly tenantRoomService: TenantRoomService,
+    private readonly tenantContractsService: TenantContractsService,
+    private readonly tenantInvoicesService: TenantInvoicesService,
+    private readonly tenantPaymentsService: TenantPaymentsService,
   ) {}
 
   async handleFunctionCall(
@@ -132,6 +140,46 @@ export class ToolAIService {
         return this.searchPayments(args, user);
       }
 
+      case this.getTenantDashboard.name: {
+        this.assertTenant(user);
+        return this.getTenantDashboard(user);
+      }
+
+      case this.getMyRoom.name: {
+        this.assertTenant(user);
+        return this.getMyRoom(user);
+      }
+
+      case this.getMyContracts.name: {
+        this.assertTenant(user);
+        return this.getMyContracts(args, user);
+      }
+
+      case this.getMyContractDetail.name: {
+        this.assertTenant(user);
+        return this.getMyContractDetail(args.contractId, user);
+      }
+
+      case this.getMyInvoices.name: {
+        this.assertTenant(user);
+        return this.getMyInvoices(args, user);
+      }
+
+      case this.getMyInvoiceDetail.name: {
+        this.assertTenant(user);
+        return this.getMyInvoiceDetail(args.invoiceId, user);
+      }
+
+      case this.getMyPayments.name: {
+        this.assertTenant(user);
+        return this.getMyPayments(args, user);
+      }
+
+      case this.getMyPaymentDetail.name: {
+        this.assertTenant(user);
+        return this.getMyPaymentDetail(args.paymentId, user);
+      }
+
       default:
         throw new Error(`Unknown function call: ${functionName}`);
     }
@@ -145,6 +193,12 @@ export class ToolAIService {
 
   private assertLandlord(user: User) {
     if (user.role !== UserRole.LANDLORD) {
+      throw new ForbiddenException('Không có quyền sử dụng chức năng này');
+    }
+  }
+
+  private assertTenant(user: User) {
+    if (user.role !== UserRole.TENANT) {
       throw new ForbiddenException('Không có quyền sử dụng chức năng này');
     }
   }
@@ -271,7 +325,12 @@ export class ToolAIService {
   }
 
   async searchTenants(
-    args: { search?: string; hasAccount?: boolean; page?: number; limit?: number },
+    args: {
+      search?: string;
+      hasAccount?: boolean;
+      page?: number;
+      limit?: number;
+    },
     user: User,
   ) {
     return this.tenantsService.findAll(
@@ -371,5 +430,73 @@ export class ToolAIService {
       } as any,
       user,
     );
+  }
+
+  async getTenantDashboard(user: User) {
+    return this.tenantDashboardService.getDashboard(user);
+  }
+
+  async getMyRoom(user: User) {
+    return this.tenantRoomService.findCurrentRoom(user);
+  }
+
+  async getMyContracts(
+    args: { status?: ContractStatus; page?: number; limit?: number },
+    user: User,
+  ) {
+    return this.tenantContractsService.findAll(
+      {
+        status: args.status,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getMyContractDetail(contractId: string, user: User) {
+    return this.tenantContractsService.findOne(contractId, user);
+  }
+
+  async getMyInvoices(
+    args: {
+      status?: InvoiceStatus;
+      period?: string;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.tenantInvoicesService.findAll(
+      {
+        status: args.status,
+        period: args.period,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getMyInvoiceDetail(invoiceId: string, user: User) {
+    return this.tenantInvoicesService.findOne(invoiceId, user);
+  }
+
+  async getMyPayments(
+    args: { paymentMethod?: PaymentMethod; page?: number; limit?: number },
+    user: User,
+  ) {
+    return this.tenantPaymentsService.findAll(
+      {
+        paymentMethod: args.paymentMethod,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getMyPaymentDetail(paymentId: string, user: User) {
+    return this.tenantPaymentsService.findOne(paymentId, user);
   }
 }

@@ -408,9 +408,119 @@ export const LANDLORD_TOOLS: GeminiTool_2[] = [
   },
 ];
 
+// Tools chỉ đọc (read-only) dùng cho Tenant — chỉ xem dữ liệu của chính mình
+export const TENANT_TOOLS: GeminiTool_2[] = [
+  {
+    type: 'function',
+    name: 'getTenantDashboard',
+    description:
+      'Xem tổng quan cá nhân: phòng đang thuê, hợp đồng đang hoạt động, số hóa đơn chưa thanh toán, tổng tiền chưa thanh toán, hạn thanh toán gần nhất, thanh toán gần đây.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    type: 'function',
+    name: 'getMyRoom',
+    description:
+      'Xem thông tin phòng đang thuê hiện tại: số phòng, diện tích, tiện nghi, dịch vụ gắn kèm, người ở cùng, thông tin hợp đồng.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    type: 'function',
+    name: 'getMyContracts',
+    description: 'Xem danh sách hợp đồng của bản thân (đang hoạt động, đã hết hạn, đã chấm dứt).',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          description: 'Lọc theo trạng thái hợp đồng',
+          enum: ['active', 'expired', 'terminated'],
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMyContractDetail',
+    description:
+      'Xem chi tiết 1 hợp đồng của bản thân: người ở cùng, dịch vụ, tài liệu đính kèm, phụ lục.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contractId: { type: 'string', description: 'ID của hợp đồng cần xem' },
+      },
+      required: ['contractId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMyInvoices',
+    description: 'Xem danh sách hóa đơn của bản thân theo kỳ, trạng thái.',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          description: 'Lọc theo trạng thái hóa đơn',
+          enum: ['unpaid', 'paid', 'cancelled'],
+        },
+        period: {
+          type: 'string',
+          description: 'Lọc theo kỳ hóa đơn, định dạng YYYY-MM',
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMyInvoiceDetail',
+    description: 'Xem chi tiết 1 hóa đơn của bản thân: các khoản mục chi tiết.',
+    parameters: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string', description: 'ID của hóa đơn cần xem' },
+      },
+      required: ['invoiceId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMyPayments',
+    description: 'Xem lịch sử thanh toán của bản thân theo phương thức thanh toán.',
+    parameters: {
+      type: 'object',
+      properties: {
+        paymentMethod: {
+          type: 'string',
+          description: 'Lọc theo phương thức thanh toán',
+          enum: ['cash', 'transfer', 'other'],
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMyPaymentDetail',
+    description: 'Xem chi tiết 1 lần thanh toán của bản thân.',
+    parameters: {
+      type: 'object',
+      properties: {
+        paymentId: { type: 'string', description: 'ID của thanh toán cần xem' },
+      },
+      required: ['paymentId'],
+    },
+  },
+];
+
 export const GEMINI_TOOLS = {
   [UserRole.SUPER_ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
   [UserRole.ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
   [UserRole.LANDLORD]: [...BASE_TOOLS, ...LANDLORD_TOOLS],
-  [UserRole.TENANT]: [...BASE_TOOLS],
+  [UserRole.TENANT]: [...BASE_TOOLS, ...TENANT_TOOLS],
 };

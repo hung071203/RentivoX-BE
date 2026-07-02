@@ -10,5 +10,6 @@ import { InvoicesService } from './invoices.service';
   imports: [TypeOrmModule.forFeature([Invoice, RoomOccupant, Tenant])],
   controllers: [InvoicesController],
   providers: [InvoicesService],
+  exports: [InvoicesService],
 })
 export class TenantInvoicesModule {}

@@ -11,6 +11,11 @@ import { TenantsModule } from '../landlord/tenants/tenants.module';
 import { ContractsModule } from '../landlord/contracts/contracts.module';
 import { InvoicesModule } from '../landlord/invoices/invoices.module';
 import { PaymentsModule } from '../landlord/payments/payments.module';
+import { TenantDashboardModule } from '../tenant/dashboard/dashboard.module';
+import { TenantRoomModule } from '../tenant/room/room.module';
+import { TenantContractsModule } from '../tenant/contracts/contracts.module';
+import { TenantInvoicesModule } from '../tenant/invoices/invoices.module';
+import { TenantPaymentsModule } from '../tenant/payments/payments.module';
 import { ChatController } from './chat.controller';
 
 @Module({
@@ -26,6 +31,11 @@ import { ChatController } from './chat.controller';
     ContractsModule,
     InvoicesModule,
     PaymentsModule,
+    TenantDashboardModule,
+    TenantRoomModule,
+    TenantContractsModule,
+    TenantInvoicesModule,
+    TenantPaymentsModule,
   ],
   controllers: [ChatController],
   providers: [ToolAIService],

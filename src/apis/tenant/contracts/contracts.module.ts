@@ -22,5 +22,6 @@ import { ContractsService } from './contracts.service';
   ],
   controllers: [ContractsController],
   providers: [ContractsService],
+  exports: [ContractsService],
 })
 export class TenantContractsModule {}
