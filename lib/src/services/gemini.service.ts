@@ -191,6 +191,7 @@ export class GeminiService {
             const result = await this.toolAIService.handleFunctionCall(
               call.name,
               call.arguments,
+              user,
             );
             results.push({ name: call.name, result });
           } catch (error: any) {
