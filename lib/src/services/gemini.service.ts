@@ -14,7 +14,7 @@ import { ENV } from '@lib/configs/env.config';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Interactions } from '@google/genai';
 import { User } from '@entities/user.entity';
-import { ToolAIService } from './tool-ai.service';
+import type { ToolAIService } from './tool-ai.service';
 
 @Injectable()
 export class GeminiService {
@@ -22,7 +22,7 @@ export class GeminiService {
 
   private readonly client: GoogleGenAI;
 
-  constructor(private readonly toolAIService: ToolAIService) {
+  constructor() {
     this.client = new GoogleGenAI({
       apiKey: ENV.googleApiKey,
     });
@@ -169,6 +169,7 @@ export class GeminiService {
     },
     user: User,
     textCallback: (response: any) => void,
+    toolAIService: ToolAIService,
   ): Promise<GeminiChatResponse> {
     while (true) {
       try {
@@ -188,7 +189,7 @@ export class GeminiService {
 
         for (const call of res.toolCalls) {
           try {
-            const result = await this.toolAIService.handleFunctionCall(
+            const result = await toolAIService.handleFunctionCall(
               call.name,
               call.arguments,
               user,

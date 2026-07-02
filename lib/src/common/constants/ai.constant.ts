@@ -1,4 +1,3 @@
-import { ToolAIService } from '@lib/services/tool-ai.service';
 import { UserRole } from '../enums';
 import { GeminiTool_2 } from '../interfaces/gemini.interface';
 import { PAGE_TOPICS } from './page-links.constant';
@@ -92,12 +91,10 @@ export const GEMINI_RESPONSE_SCHEMA = {
   },
 };
 
-export const AI_SV_PROTOTYPE = ToolAIService.prototype;
-
 export const BASE_TOOLS: GeminiTool_2[] = [
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.getCurrentDate.name,
+    name: 'getCurrentDate',
     description: 'Get the current date',
     parameters: {
       type: 'object',
@@ -112,7 +109,7 @@ export const BASE_TOOLS: GeminiTool_2[] = [
   },
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.getFrontendPageLink.name,
+    name: 'getFrontendPageLink',
     description:
       'Lấy đường dẫn (route) trang trên giao diện web tương ứng với 1 tính năng, để hướng dẫn người dùng điều hướng đến đúng trang khi họ không biết vào đâu. Chỉ trả về trang phù hợp với vai trò hiện tại của người dùng.',
     parameters: {
@@ -133,7 +130,7 @@ export const BASE_TOOLS: GeminiTool_2[] = [
 export const ADMIN_TOOLS: GeminiTool_2[] = [
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.getSystemOverview.name,
+    name: 'getSystemOverview',
     description:
       'Xem thống kê tổng quan toàn hệ thống: tổng số chủ trọ, người thuê, nhà trọ, phòng, tỷ lệ lấp đầy và top 5 chủ trọ có nhiều phòng nhất.',
     parameters: {
@@ -144,7 +141,7 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
   },
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.searchUsers.name,
+    name: 'searchUsers',
     description:
       'Tìm kiếm/liệt kê tài khoản admin hoặc chủ trọ theo tên, email, vai trò, trạng thái hoạt động. Dùng để tra cứu thông tin hoặc lấy userId trước khi xem chi tiết.',
     parameters: {
@@ -174,7 +171,7 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
   },
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.getUserDetail.name,
+    name: 'getUserDetail',
     description: 'Xem chi tiết thông tin 1 tài khoản (admin hoặc chủ trọ) theo id.',
     parameters: {
       type: 'object',
@@ -186,7 +183,7 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
   },
   {
     type: 'function',
-    name: AI_SV_PROTOTYPE.listProperties.name,
+    name: 'listProperties',
     description:
       'Xem danh sách nhà trọ trong toàn hệ thống, có thể lọc theo tên/địa chỉ hoặc theo chủ trọ.',
     parameters: {
@@ -211,9 +208,209 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
   },
 ];
 
+const PAGE_PARAMS = {
+  page: { type: 'integer', description: 'Số trang, mặc định 1' },
+  limit: {
+    type: 'integer',
+    description: 'Số kết quả mỗi trang, mặc định 20, tối đa 100',
+  },
+};
+
+// Tools chỉ đọc (read-only) dùng cho Landlord — quản lý nhà trọ của chính mình
+export const LANDLORD_TOOLS: GeminiTool_2[] = [
+  {
+    type: 'function',
+    name: 'getLandlordDashboard',
+    description:
+      'Xem thống kê tổng quan nhà trọ của chủ trọ hiện tại: số phòng theo trạng thái, hợp đồng đang hoạt động, doanh thu tháng này, hóa đơn chưa thu, hợp đồng sắp hết hạn, thanh toán gần đây, doanh thu 6 tháng gần nhất.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    type: 'function',
+    name: 'searchProperties',
+    description: 'Tìm kiếm/liệt kê nhà trọ của chủ trọ hiện tại theo tên/địa chỉ.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Tìm theo tên hoặc địa chỉ' },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchRooms',
+    description:
+      'Tìm kiếm/liệt kê phòng theo nhà trọ, trạng thái, loại phòng. Dùng để biết phòng nào đang trống, đang cho thuê, bảo trì...',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Tìm theo số phòng' },
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        status: {
+          type: 'string',
+          description: 'Lọc theo trạng thái phòng',
+          enum: ['available', 'occupied', 'maintenance', 'reserved'],
+        },
+        roomType: {
+          type: 'string',
+          description: 'Lọc theo loại phòng',
+          enum: ['shared', 'private'],
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getRoomDetail',
+    description: 'Xem chi tiết 1 phòng: dịch vụ gắn kèm, số người đang ở, tiện nghi.',
+    parameters: {
+      type: 'object',
+      properties: {
+        roomId: { type: 'string', description: 'ID của phòng cần xem' },
+      },
+      required: ['roomId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchTenants',
+    description: 'Tìm kiếm/liệt kê khách thuê của chủ trọ hiện tại theo tên/sđt/CCCD.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Tìm theo tên, số điện thoại hoặc số CCCD',
+        },
+        hasAccount: {
+          type: 'boolean',
+          description: 'Lọc theo việc khách thuê đã có tài khoản đăng nhập hay chưa',
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getTenantDetail',
+    description: 'Xem chi tiết thông tin 1 khách thuê theo id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tenantId: { type: 'string', description: 'ID của khách thuê cần xem' },
+      },
+      required: ['tenantId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchContracts',
+    description:
+      'Tìm kiếm/liệt kê hợp đồng theo nhà trọ, phòng, trạng thái. Dùng để biết hợp đồng nào đang hoạt động, sắp hết hạn, đã chấm dứt...',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Tìm theo mã hợp đồng hoặc số phòng',
+        },
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        roomId: { type: 'string', description: 'Lọc theo id phòng' },
+        status: {
+          type: 'string',
+          description: 'Lọc theo trạng thái hợp đồng',
+          enum: ['active', 'expired', 'terminated'],
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getContractDetail',
+    description:
+      'Xem chi tiết 1 hợp đồng: người ở (hiện tại + đã rời đi), dịch vụ, tài liệu đính kèm, phụ lục.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contractId: { type: 'string', description: 'ID của hợp đồng cần xem' },
+      },
+      required: ['contractId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchInvoices',
+    description:
+      'Tìm kiếm/liệt kê hóa đơn theo nhà trọ, phòng, hợp đồng, kỳ, trạng thái. Dùng để biết hóa đơn nào chưa thu, quá hạn...',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        roomId: { type: 'string', description: 'Lọc theo id phòng' },
+        contractId: { type: 'string', description: 'Lọc theo id hợp đồng' },
+        status: {
+          type: 'string',
+          description: 'Lọc theo trạng thái hóa đơn',
+          enum: ['unpaid', 'paid', 'cancelled'],
+        },
+        period: {
+          type: 'string',
+          description: 'Lọc theo kỳ hóa đơn, định dạng YYYY-MM',
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getInvoiceDetail',
+    description: 'Xem chi tiết 1 hóa đơn: các khoản mục, người đại diện, thời hạn hợp đồng.',
+    parameters: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string', description: 'ID của hóa đơn cần xem' },
+      },
+      required: ['invoiceId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchPayments',
+    description: 'Tìm kiếm/liệt kê lịch sử thanh toán theo hóa đơn, nhà trọ, phương thức.',
+    parameters: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string', description: 'Lọc theo id hóa đơn' },
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        paymentMethod: {
+          type: 'string',
+          description: 'Lọc theo phương thức thanh toán',
+          enum: ['cash', 'transfer', 'other'],
+        },
+        source: {
+          type: 'string',
+          description: 'Lọc theo nguồn ghi nhận thanh toán',
+          enum: ['manual', 'automatic'],
+        },
+        referenceCode: { type: 'string', description: 'Tìm theo mã giao dịch' },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+];
+
 export const GEMINI_TOOLS = {
   [UserRole.SUPER_ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
   [UserRole.ADMIN]: [...BASE_TOOLS, ...ADMIN_TOOLS],
-  [UserRole.LANDLORD]: [...BASE_TOOLS],
+  [UserRole.LANDLORD]: [...BASE_TOOLS, ...LANDLORD_TOOLS],
   [UserRole.TENANT]: [...BASE_TOOLS],
 };

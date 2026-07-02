@@ -4,12 +4,16 @@ import { JwtAuthGuard } from '@lib/guards';
 import { CurrentUser } from '@lib/decorators';
 import { User } from '@entities/user.entity';
 import { GeminiService } from '@lib/services/gemini.service';
+import { ToolAIService } from '@lib/services/tool-ai.service';
 import { ChatDto } from './dto/chat.dto';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private readonly geminiService: GeminiService) {}
+  constructor(
+    private readonly geminiService: GeminiService,
+    private readonly toolAIService: ToolAIService,
+  ) {}
 
   @Post()
   async chat(
@@ -33,6 +37,7 @@ export class ChatController {
         (text: string) => {
           res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
         },
+        this.toolAIService,
       );
 
       res.write(

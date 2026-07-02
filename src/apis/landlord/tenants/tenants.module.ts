@@ -18,5 +18,6 @@ import { TenantsService } from './tenants.service';
   ],
   controllers: [TenantsController],
   providers: [TenantsService],
+  exports: [TenantsService],
 })
 export class TenantsModule {}

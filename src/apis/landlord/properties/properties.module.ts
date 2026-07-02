@@ -9,5 +9,6 @@ import { PropertiesService } from './properties.service';
   imports: [TypeOrmModule.forFeature([Property, Room])],
   controllers: [PropertiesController],
   providers: [PropertiesService],
+  exports: [PropertiesService],
 })
 export class PropertiesModule {}

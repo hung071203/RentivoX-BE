@@ -1,12 +1,27 @@
 import { User } from '@entities/user.entity';
 import { DEFAULT_TIMEZONE } from '@lib/common/constants/app.constant';
 import { ROLE_PAGE_LINKS } from '@lib/common/constants/page-links.constant';
-import { UserRole } from '@lib/common/enums';
+import {
+  ContractStatus,
+  InvoiceStatus,
+  PaymentMethod,
+  PaymentSource,
+  RoomStatus,
+  RoomType,
+  UserRole,
+} from '@lib/common/enums';
 import { DateUtils } from '@lib/utils/date.util';
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { UsersService } from '../../../src/apis/admin/users/users.service';
 import { DashboardService } from '../../../src/apis/admin/dashboard/dashboard.service';
 import { AdminPropertiesService } from '../../../src/apis/admin/properties/properties.service';
+import { DashboardService as LandlordDashboardService } from '../../../src/apis/landlord/dashboard/dashboard.service';
+import { PropertiesService as LandlordPropertiesService } from '../../../src/apis/landlord/properties/properties.service';
+import { RoomsService } from '../../../src/apis/landlord/rooms/rooms.service';
+import { TenantsService } from '../../../src/apis/landlord/tenants/tenants.service';
+import { ContractsService } from '../../../src/apis/landlord/contracts/contracts.service';
+import { InvoicesService } from '../../../src/apis/landlord/invoices/invoices.service';
+import { PaymentsService } from '../../../src/apis/landlord/payments/payments.service';
 import { ENV } from '@lib/configs/env.config';
 
 const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
@@ -19,6 +34,13 @@ export class ToolAIService {
     private readonly usersService: UsersService,
     private readonly dashboardService: DashboardService,
     private readonly adminPropertiesService: AdminPropertiesService,
+    private readonly landlordDashboardService: LandlordDashboardService,
+    private readonly landlordPropertiesService: LandlordPropertiesService,
+    private readonly roomsService: RoomsService,
+    private readonly tenantsService: TenantsService,
+    private readonly contractsService: ContractsService,
+    private readonly invoicesService: InvoicesService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async handleFunctionCall(
@@ -55,6 +77,61 @@ export class ToolAIService {
         return this.listProperties(args);
       }
 
+      case this.getLandlordDashboard.name: {
+        this.assertLandlord(user);
+        return this.getLandlordDashboard(user);
+      }
+
+      case this.searchProperties.name: {
+        this.assertLandlord(user);
+        return this.searchProperties(args, user);
+      }
+
+      case this.searchRooms.name: {
+        this.assertLandlord(user);
+        return this.searchRooms(args, user);
+      }
+
+      case this.getRoomDetail.name: {
+        this.assertLandlord(user);
+        return this.getRoomDetail(args.roomId, user);
+      }
+
+      case this.searchTenants.name: {
+        this.assertLandlord(user);
+        return this.searchTenants(args, user);
+      }
+
+      case this.getTenantDetail.name: {
+        this.assertLandlord(user);
+        return this.getTenantDetail(args.tenantId, user);
+      }
+
+      case this.searchContracts.name: {
+        this.assertLandlord(user);
+        return this.searchContracts(args, user);
+      }
+
+      case this.getContractDetail.name: {
+        this.assertLandlord(user);
+        return this.getContractDetail(args.contractId, user);
+      }
+
+      case this.searchInvoices.name: {
+        this.assertLandlord(user);
+        return this.searchInvoices(args, user);
+      }
+
+      case this.getInvoiceDetail.name: {
+        this.assertLandlord(user);
+        return this.getInvoiceDetail(args.invoiceId, user);
+      }
+
+      case this.searchPayments.name: {
+        this.assertLandlord(user);
+        return this.searchPayments(args, user);
+      }
+
       default:
         throw new Error(`Unknown function call: ${functionName}`);
     }
@@ -62,6 +139,12 @@ export class ToolAIService {
 
   private assertAdmin(user: User) {
     if (!ADMIN_ROLES.includes(user.role)) {
+      throw new ForbiddenException('Không có quyền sử dụng chức năng này');
+    }
+  }
+
+  private assertLandlord(user: User) {
+    if (user.role !== UserRole.LANDLORD) {
       throw new ForbiddenException('Không có quyền sử dụng chức năng này');
     }
   }
@@ -139,5 +222,154 @@ export class ToolAIService {
       page: args.page ?? 1,
       limit: args.limit ?? 20,
     } as any);
+  }
+
+  async getLandlordDashboard(user: User) {
+    return this.landlordDashboardService.getDashboard(user);
+  }
+
+  async searchProperties(
+    args: { search?: string; page?: number; limit?: number },
+    user: User,
+  ) {
+    return this.landlordPropertiesService.findAll(
+      {
+        search: args.search,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async searchRooms(
+    args: {
+      search?: string;
+      propertyId?: string;
+      status?: RoomStatus;
+      roomType?: RoomType;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.roomsService.findAll(
+      {
+        search: args.search,
+        propertyId: args.propertyId,
+        status: args.status,
+        roomType: args.roomType,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getRoomDetail(roomId: string, user: User) {
+    return this.roomsService.findOne(roomId, user);
+  }
+
+  async searchTenants(
+    args: { search?: string; hasAccount?: boolean; page?: number; limit?: number },
+    user: User,
+  ) {
+    return this.tenantsService.findAll(
+      {
+        search: args.search,
+        hasAccount: args.hasAccount,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getTenantDetail(tenantId: string, user: User) {
+    return this.tenantsService.findOne(tenantId, user);
+  }
+
+  async searchContracts(
+    args: {
+      search?: string;
+      propertyId?: string;
+      roomId?: string;
+      status?: ContractStatus;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.contractsService.findAll(
+      {
+        search: args.search,
+        propertyId: args.propertyId,
+        roomId: args.roomId,
+        status: args.status,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getContractDetail(contractId: string, user: User) {
+    return this.contractsService.findOne(contractId, user);
+  }
+
+  async searchInvoices(
+    args: {
+      propertyId?: string;
+      roomId?: string;
+      contractId?: string;
+      status?: InvoiceStatus;
+      period?: string;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.invoicesService.findAll(
+      {
+        propertyId: args.propertyId,
+        roomId: args.roomId,
+        contractId: args.contractId,
+        status: args.status,
+        period: args.period,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getInvoiceDetail(invoiceId: string, user: User) {
+    return this.invoicesService.findOne(invoiceId, user);
+  }
+
+  async searchPayments(
+    args: {
+      invoiceId?: string;
+      propertyId?: string;
+      paymentMethod?: PaymentMethod;
+      source?: PaymentSource;
+      referenceCode?: string;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.paymentsService.findAll(
+      {
+        invoiceId: args.invoiceId,
+        propertyId: args.propertyId,
+        paymentMethod: args.paymentMethod,
+        source: args.source,
+        referenceCode: args.referenceCode,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
   }
 }
