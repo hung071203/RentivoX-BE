@@ -206,6 +206,30 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
       required: [],
     },
   },
+  {
+    type: 'function',
+    name: 'broadcastSystemNotification',
+    description:
+      'Gửi thông báo hệ thống (system announcement) đến người dùng — chọn đối tượng nhận là tất cả (chủ trọ + người thuê), chỉ chủ trọ, hoặc chỉ người thuê. LUÔN xác nhận lại nội dung (tiêu đề + nội dung + đối tượng) với người dùng trước khi gửi thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo' },
+        message: { type: 'string', description: 'Nội dung thông báo' },
+        target: {
+          type: 'string',
+          description: 'Đối tượng nhận thông báo',
+          enum: ['all', 'landlord', 'tenant'],
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận gửi. Mặc định false/không có = chỉ xem trước, chưa gửi.',
+        },
+      },
+      required: ['title', 'message', 'target'],
+    },
+  },
 ];
 
 const PAGE_PARAMS = {

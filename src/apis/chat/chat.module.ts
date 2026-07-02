@@ -16,6 +16,7 @@ import { TenantRoomModule } from '../tenant/room/room.module';
 import { TenantContractsModule } from '../tenant/contracts/contracts.module';
 import { TenantInvoicesModule } from '../tenant/invoices/invoices.module';
 import { TenantPaymentsModule } from '../tenant/payments/payments.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 import { ChatController } from './chat.controller';
 
 @Module({
@@ -36,6 +37,7 @@ import { ChatController } from './chat.controller';
     TenantContractsModule,
     TenantInvoicesModule,
     TenantPaymentsModule,
+    NotificationsModule,
   ],
   controllers: [ChatController],
   providers: [ToolAIService],

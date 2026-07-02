@@ -27,6 +27,7 @@ import { RoomService as TenantRoomService } from '../../../src/apis/tenant/room/
 import { ContractsService as TenantContractsService } from '../../../src/apis/tenant/contracts/contracts.service';
 import { InvoicesService as TenantInvoicesService } from '../../../src/apis/tenant/invoices/invoices.service';
 import { PaymentsService as TenantPaymentsService } from '../../../src/apis/tenant/payments/payments.service';
+import { NotificationsService } from '../../../src/notifications/notifications.service';
 import { ENV } from '@lib/configs/env.config';
 
 const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
@@ -49,6 +50,7 @@ export class ToolAIService {
     private readonly tenantContractsService: TenantContractsService,
     private readonly tenantInvoicesService: TenantInvoicesService,
     private readonly tenantPaymentsService: TenantPaymentsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async handleFunctionCall(
@@ -83,6 +85,11 @@ export class ToolAIService {
       case this.listProperties.name: {
         this.assertAdmin(user);
         return this.listProperties(args);
+      }
+
+      case this.broadcastSystemNotification.name: {
+        this.assertAdmin(user);
+        return this.broadcastSystemNotification(args, user);
       }
 
       case this.getLandlordDashboard.name: {
@@ -276,6 +283,37 @@ export class ToolAIService {
       page: args.page ?? 1,
       limit: args.limit ?? 20,
     } as any);
+  }
+
+  async broadcastSystemNotification(
+    args: {
+      title?: string;
+      message?: string;
+      target?: 'all' | 'landlord' | 'tenant';
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (!args.title || !args.message || !args.target) {
+      throw new ForbiddenException(
+        'Cần đủ title, message, target để gửi thông báo',
+      );
+    }
+    if (args.confirm !== true) {
+      return {
+        sent: false,
+        message:
+          'Chưa gửi. Hãy xác nhận lại nội dung với người dùng trước, sau đó gọi lại với confirm=true để gửi thông báo.',
+      };
+    }
+
+    await this.notificationsService.createSystemAnnouncement(user.id, {
+      title: args.title,
+      message: args.message,
+      target: args.target,
+    });
+
+    return { sent: true };
   }
 
   async getLandlordDashboard(user: User) {
