@@ -22,11 +22,13 @@ import { TenantsService } from '../../../src/apis/landlord/tenants/tenants.servi
 import { ContractsService } from '../../../src/apis/landlord/contracts/contracts.service';
 import { InvoicesService } from '../../../src/apis/landlord/invoices/invoices.service';
 import { PaymentsService } from '../../../src/apis/landlord/payments/payments.service';
+import { VehiclesService } from '../../../src/apis/landlord/vehicles/vehicles.service';
 import { DashboardService as TenantDashboardService } from '../../../src/apis/tenant/dashboard/dashboard.service';
 import { RoomService as TenantRoomService } from '../../../src/apis/tenant/room/room.service';
 import { ContractsService as TenantContractsService } from '../../../src/apis/tenant/contracts/contracts.service';
 import { InvoicesService as TenantInvoicesService } from '../../../src/apis/tenant/invoices/invoices.service';
 import { PaymentsService as TenantPaymentsService } from '../../../src/apis/tenant/payments/payments.service';
+import { VehiclesService as TenantVehiclesService } from '../../../src/apis/tenant/vehicles/vehicles.service';
 import { NotificationsService } from '../../../src/notifications/notifications.service';
 import { ENV } from '@lib/configs/env.config';
 
@@ -45,11 +47,13 @@ export class ToolAIService {
     private readonly contractsService: ContractsService,
     private readonly invoicesService: InvoicesService,
     private readonly paymentsService: PaymentsService,
+    private readonly vehiclesService: VehiclesService,
     private readonly tenantDashboardService: TenantDashboardService,
     private readonly tenantRoomService: TenantRoomService,
     private readonly tenantContractsService: TenantContractsService,
     private readonly tenantInvoicesService: TenantInvoicesService,
     private readonly tenantPaymentsService: TenantPaymentsService,
+    private readonly tenantVehiclesService: TenantVehiclesService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -147,6 +151,11 @@ export class ToolAIService {
         return this.searchPayments(args, user);
       }
 
+      case this.searchVehicles.name: {
+        this.assertLandlord(user);
+        return this.searchVehicles(args, user);
+      }
+
       case this.getTenantDashboard.name: {
         this.assertTenant(user);
         return this.getTenantDashboard(user);
@@ -185,6 +194,11 @@ export class ToolAIService {
       case this.getMyPaymentDetail.name: {
         this.assertTenant(user);
         return this.getMyPaymentDetail(args.paymentId, user);
+      }
+
+      case this.getMyVehicles.name: {
+        this.assertTenant(user);
+        return this.getMyVehicles(user);
       }
 
       default:
@@ -470,6 +484,28 @@ export class ToolAIService {
     );
   }
 
+  async searchVehicles(
+    args: {
+      search?: string;
+      propertyId?: string;
+      tenantId?: string;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.vehiclesService.findAll(
+      {
+        search: args.search,
+        propertyId: args.propertyId,
+        tenantId: args.tenantId,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
   async getTenantDashboard(user: User) {
     return this.tenantDashboardService.getDashboard(user);
   }
@@ -536,5 +572,9 @@ export class ToolAIService {
 
   async getMyPaymentDetail(paymentId: string, user: User) {
     return this.tenantPaymentsService.findOne(paymentId, user);
+  }
+
+  async getMyVehicles(user: User) {
+    return this.tenantVehiclesService.findMine(user);
   }
 }

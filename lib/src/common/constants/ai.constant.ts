@@ -430,6 +430,22 @@ export const LANDLORD_TOOLS: GeminiTool_2[] = [
       required: [],
     },
   },
+  {
+    type: 'function',
+    name: 'searchVehicles',
+    description:
+      'Tìm kiếm/liệt kê phương tiện (xe) của khách thuê theo nhà trọ, khách thuê hoặc biển số.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Tìm theo biển số xe' },
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        tenantId: { type: 'string', description: 'Lọc theo id khách thuê' },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
 ];
 
 // Tools chỉ đọc (read-only) dùng cho Tenant — chỉ xem dữ liệu của chính mình
@@ -539,6 +555,12 @@ export const TENANT_TOOLS: GeminiTool_2[] = [
       },
       required: ['paymentId'],
     },
+  },
+  {
+    type: 'function',
+    name: 'getMyVehicles',
+    description: 'Xem danh sách phương tiện (xe) đã đăng ký của bản thân.',
+    parameters: { type: 'object', properties: {}, required: [] },
   },
 ];
 

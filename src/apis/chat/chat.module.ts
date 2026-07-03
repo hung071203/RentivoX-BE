@@ -11,11 +11,13 @@ import { TenantsModule } from '../landlord/tenants/tenants.module';
 import { ContractsModule } from '../landlord/contracts/contracts.module';
 import { InvoicesModule } from '../landlord/invoices/invoices.module';
 import { PaymentsModule } from '../landlord/payments/payments.module';
+import { VehiclesModule } from '../landlord/vehicles/vehicles.module';
 import { TenantDashboardModule } from '../tenant/dashboard/dashboard.module';
 import { TenantRoomModule } from '../tenant/room/room.module';
 import { TenantContractsModule } from '../tenant/contracts/contracts.module';
 import { TenantInvoicesModule } from '../tenant/invoices/invoices.module';
 import { TenantPaymentsModule } from '../tenant/payments/payments.module';
+import { TenantVehiclesModule } from '../tenant/vehicles/vehicles.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { ChatController } from './chat.controller';
 
@@ -32,11 +34,13 @@ import { ChatController } from './chat.controller';
     ContractsModule,
     InvoicesModule,
     PaymentsModule,
+    VehiclesModule,
     TenantDashboardModule,
     TenantRoomModule,
     TenantContractsModule,
     TenantInvoicesModule,
     TenantPaymentsModule,
+    TenantVehiclesModule,
     NotificationsModule,
   ],
   controllers: [ChatController],
