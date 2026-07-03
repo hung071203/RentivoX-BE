@@ -3,6 +3,7 @@ import { DEFAULT_TIMEZONE } from '@lib/common/constants/app.constant';
 import { ROLE_PAGE_LINKS } from '@lib/common/constants/page-links.constant';
 import {
   ContractStatus,
+  Gender,
   InvoiceStatus,
   PaymentMethod,
   PaymentSource,
@@ -11,8 +12,12 @@ import {
   UserRole,
 } from '@lib/common/enums';
 import { DateUtils } from '@lib/utils/date.util';
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { UsersService } from '../../../src/apis/admin/users/users.service';
+import { CreateUserDto } from '../../../src/apis/admin/users/dto/create-user.dto';
+import { UpdateUserDto } from '../../../src/apis/admin/users/dto/update-user.dto';
 import { DashboardService } from '../../../src/apis/admin/dashboard/dashboard.service';
 import { AdminPropertiesService } from '../../../src/apis/admin/properties/properties.service';
 import { DashboardService as LandlordDashboardService } from '../../../src/apis/landlord/dashboard/dashboard.service';
@@ -21,8 +26,13 @@ import { RoomsService } from '../../../src/apis/landlord/rooms/rooms.service';
 import { TenantsService } from '../../../src/apis/landlord/tenants/tenants.service';
 import { ContractsService } from '../../../src/apis/landlord/contracts/contracts.service';
 import { InvoicesService } from '../../../src/apis/landlord/invoices/invoices.service';
+import { CreateInvoiceDto } from '../../../src/apis/landlord/invoices/dto/create-invoice.dto';
 import { PaymentsService } from '../../../src/apis/landlord/payments/payments.service';
+import { CreatePaymentDto } from '../../../src/apis/landlord/payments/dto/create-payment.dto';
 import { VehiclesService } from '../../../src/apis/landlord/vehicles/vehicles.service';
+import { MeterReadingsService } from '../../../src/apis/landlord/meter-readings/meter-readings.service';
+import { CreateMeterReadingDto } from '../../../src/apis/landlord/meter-readings/dto/create-meter-reading.dto';
+import { UpdateMeterReadingDto } from '../../../src/apis/landlord/meter-readings/dto/update-meter-reading.dto';
 import { DashboardService as TenantDashboardService } from '../../../src/apis/tenant/dashboard/dashboard.service';
 import { RoomService as TenantRoomService } from '../../../src/apis/tenant/room/room.service';
 import { ContractsService as TenantContractsService } from '../../../src/apis/tenant/contracts/contracts.service';
@@ -48,6 +58,7 @@ export class ToolAIService {
     private readonly invoicesService: InvoicesService,
     private readonly paymentsService: PaymentsService,
     private readonly vehiclesService: VehiclesService,
+    private readonly meterReadingsService: MeterReadingsService,
     private readonly tenantDashboardService: TenantDashboardService,
     private readonly tenantRoomService: TenantRoomService,
     private readonly tenantContractsService: TenantContractsService,
@@ -94,6 +105,21 @@ export class ToolAIService {
       case this.broadcastSystemNotification.name: {
         this.assertAdmin(user);
         return this.broadcastSystemNotification(args, user);
+      }
+
+      case this.createLandlordAccount.name: {
+        this.assertAdmin(user);
+        return this.createLandlordAccount(args, user);
+      }
+
+      case this.toggleLandlordActive.name: {
+        this.assertAdmin(user);
+        return this.toggleLandlordActive(args, user);
+      }
+
+      case this.resetLandlordPassword.name: {
+        this.assertAdmin(user);
+        return this.resetLandlordPassword(args, user);
       }
 
       case this.getLandlordDashboard.name: {
@@ -154,6 +180,41 @@ export class ToolAIService {
       case this.searchVehicles.name: {
         this.assertLandlord(user);
         return this.searchVehicles(args, user);
+      }
+
+      case this.searchMeterReadings.name: {
+        this.assertLandlord(user);
+        return this.searchMeterReadings(args, user);
+      }
+
+      case this.getMeterReadingDetail.name: {
+        this.assertLandlord(user);
+        return this.getMeterReadingDetail(args.meterReadingId, user);
+      }
+
+      case this.createInvoiceForContract.name: {
+        this.assertLandlord(user);
+        return this.createInvoiceForContract(args, user);
+      }
+
+      case this.createMeterReading.name: {
+        this.assertLandlord(user);
+        return this.createMeterReading(args, user);
+      }
+
+      case this.updateMeterReading.name: {
+        this.assertLandlord(user);
+        return this.updateMeterReading(args, user);
+      }
+
+      case this.cancelInvoice.name: {
+        this.assertLandlord(user);
+        return this.cancelInvoice(args, user);
+      }
+
+      case this.recordPayment.name: {
+        this.assertLandlord(user);
+        return this.recordPayment(args, user);
       }
 
       case this.getTenantDashboard.name: {
@@ -222,6 +283,27 @@ export class ToolAIService {
     if (user.role !== UserRole.TENANT) {
       throw new ForbiddenException('Không có quyền sử dụng chức năng này');
     }
+  }
+
+  // Các tool ghi/sửa bỏ qua ValidationPipe (gọi thẳng service, không qua controller/DTO
+  // pipeline HTTP) — validate lại thủ công bằng đúng DTO của endpoint tương ứng để giữ
+  // nguyên các ràng buộc nghiệp vụ (định dạng SĐT/email, tuổi tối thiểu, định dạng kỳ...).
+  private async validateDto<T extends object>(
+    cls: new () => T,
+    plain: Record<string, any>,
+  ): Promise<T> {
+    const instance = plainToInstance(cls, plain);
+    const errors = await validate(instance, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+    if (errors.length > 0) {
+      const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
+      throw new BadRequestException(
+        messages.length ? messages : 'Dữ liệu không hợp lệ',
+      );
+    }
+    return instance;
   }
 
   private sanitizeUser(user: User) {
@@ -328,6 +410,103 @@ export class ToolAIService {
     });
 
     return { sent: true };
+  }
+
+  async createLandlordAccount(
+    args: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      dateOfBirth?: string;
+      gender?: Gender;
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (!args.fullName || !args.email || !args.phone) {
+      throw new BadRequestException(
+        'Cần đủ họ tên, email, số điện thoại để tạo tài khoản chủ trọ',
+      );
+    }
+
+    const dto = await this.validateDto(CreateUserDto, {
+      fullName: args.fullName,
+      email: args.email,
+      phone: args.phone,
+      role: UserRole.LANDLORD,
+      dateOfBirth: args.dateOfBirth,
+      gender: args.gender,
+    });
+
+    if (args.confirm !== true) {
+      return {
+        created: false,
+        preview: dto,
+        message:
+          'Chưa tạo. Hãy xác nhận lại thông tin với người dùng, sau đó gọi lại với confirm=true để tạo tài khoản.',
+      };
+    }
+
+    const created = await this.usersService.create(dto, user);
+    return { created: true, user: this.sanitizeUser(created) };
+  }
+
+  async toggleLandlordActive(
+    args: { userId?: string; confirm?: boolean },
+    user: User,
+  ) {
+    if (!args.userId) {
+      throw new BadRequestException('Cần userId của chủ trọ cần khóa/mở khóa');
+    }
+
+    const target = await this.usersService.findOne(args.userId);
+    if (target.role !== UserRole.LANDLORD) {
+      throw new ForbiddenException('Chỉ áp dụng cho tài khoản chủ trọ');
+    }
+
+    if (args.confirm !== true) {
+      return {
+        toggled: false,
+        current: this.sanitizeUser(target),
+        willChangeTo: !target.isActive,
+        message: `Chưa thực hiện. Xác nhận với người dùng muốn ${
+          target.isActive ? 'khóa' : 'mở khóa'
+        } tài khoản "${target.fullName}", sau đó gọi lại với confirm=true.`,
+      };
+    }
+
+    const updated = await this.usersService.toggleActive(args.userId, user);
+    return { toggled: true, user: this.sanitizeUser(updated) };
+  }
+
+  async resetLandlordPassword(
+    args: { userId?: string; confirm?: boolean },
+    user: User,
+  ) {
+    if (!args.userId) {
+      throw new BadRequestException(
+        'Cần userId của chủ trọ cần cấp lại mật khẩu',
+      );
+    }
+
+    const target = await this.usersService.findOne(args.userId);
+    if (target.role !== UserRole.LANDLORD) {
+      throw new ForbiddenException('Chỉ áp dụng cho tài khoản chủ trọ');
+    }
+
+    if (args.confirm !== true) {
+      return {
+        reset: false,
+        target: this.sanitizeUser(target),
+        message: `Chưa thực hiện. Xác nhận với người dùng muốn cấp lại mật khẩu cho "${target.fullName}" (${target.email}) — mật khẩu mới sẽ được gửi tự động qua email, sau đó gọi lại với confirm=true.`,
+      };
+    }
+
+    const dto = await this.validateDto(UpdateUserDto, {
+      isResetPassword: true,
+    });
+    await this.usersService.update(args.userId, dto, user);
+    return { reset: true, email: target.email };
   }
 
   async getLandlordDashboard(user: User) {
@@ -504,6 +683,227 @@ export class ToolAIService {
       } as any,
       user,
     );
+  }
+
+  async createInvoiceForContract(
+    args: {
+      contractId?: string;
+      period?: string;
+      notes?: string;
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (!args.contractId || !args.period) {
+      throw new BadRequestException(
+        'Cần contractId và period (YYYY-MM) để tạo hóa đơn',
+      );
+    }
+
+    const dto = await this.validateDto(CreateInvoiceDto, {
+      contractId: args.contractId,
+      period: args.period,
+      notes: args.notes,
+    });
+
+    if (args.confirm !== true) {
+      const contract = await this.contractsService.findOne(
+        args.contractId,
+        user,
+      );
+      return {
+        created: false,
+        preview: { contract, period: dto.period, notes: dto.notes },
+        message:
+          'Chưa tạo. Xác nhận lại hợp đồng và kỳ với người dùng, đảm bảo đã nhập đủ chỉ số dịch vụ, sau đó gọi lại với confirm=true để tạo hóa đơn.',
+      };
+    }
+
+    const invoice = await this.invoicesService.createManual(dto, user);
+    return { created: true, invoice };
+  }
+
+  async searchMeterReadings(
+    args: {
+      propertyId?: string;
+      roomId?: string;
+      serviceId?: string;
+      period?: string;
+      page?: number;
+      limit?: number;
+    },
+    user: User,
+  ) {
+    return this.meterReadingsService.findAll(
+      {
+        propertyId: args.propertyId,
+        roomId: args.roomId,
+        serviceId: args.serviceId,
+        period: args.period,
+        page: args.page ?? 1,
+        limit: args.limit ?? 20,
+      } as any,
+      user,
+    );
+  }
+
+  async getMeterReadingDetail(meterReadingId: string, user: User) {
+    return this.meterReadingsService.findOne(meterReadingId, user);
+  }
+
+  async createMeterReading(
+    args: {
+      roomId?: string;
+      serviceId?: string;
+      period?: string;
+      valueStart?: number;
+      valueEnd?: number;
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (
+      !args.roomId ||
+      !args.serviceId ||
+      !args.period ||
+      args.valueStart === undefined ||
+      args.valueEnd === undefined
+    ) {
+      throw new BadRequestException(
+        'Cần đủ roomId, serviceId, period, valueStart, valueEnd để ghi chỉ số',
+      );
+    }
+
+    const dto = await this.validateDto(CreateMeterReadingDto, {
+      roomId: args.roomId,
+      serviceId: args.serviceId,
+      period: args.period,
+      valueStart: args.valueStart,
+      valueEnd: args.valueEnd,
+    });
+
+    if (args.confirm !== true) {
+      return {
+        created: false,
+        preview: dto,
+        message:
+          'Chưa ghi. Xác nhận lại thông tin chỉ số với người dùng, sau đó gọi lại với confirm=true.',
+      };
+    }
+
+    const reading = await this.meterReadingsService.create(dto, user);
+    return { created: true, reading };
+  }
+
+  async updateMeterReading(
+    args: {
+      meterReadingId?: string;
+      valueStart?: number;
+      valueEnd?: number;
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (!args.meterReadingId) {
+      throw new BadRequestException('Cần meterReadingId để chỉnh sửa chỉ số');
+    }
+    if (args.valueStart === undefined && args.valueEnd === undefined) {
+      throw new BadRequestException(
+        'Cần ít nhất 1 trong 2: valueStart hoặc valueEnd để chỉnh sửa',
+      );
+    }
+
+    const dto = await this.validateDto(UpdateMeterReadingDto, {
+      valueStart: args.valueStart,
+      valueEnd: args.valueEnd,
+    });
+
+    if (args.confirm !== true) {
+      const current = await this.meterReadingsService.findOne(
+        args.meterReadingId,
+        user,
+      );
+      return {
+        updated: false,
+        current,
+        changes: dto,
+        message:
+          'Chưa cập nhật. Xác nhận lại thay đổi với người dùng, sau đó gọi lại với confirm=true.',
+      };
+    }
+
+    const updated = await this.meterReadingsService.update(
+      args.meterReadingId,
+      dto,
+      user,
+    );
+    return { updated: true, reading: updated };
+  }
+
+  async cancelInvoice(
+    args: { invoiceId?: string; confirm?: boolean },
+    user: User,
+  ) {
+    if (!args.invoiceId) {
+      throw new BadRequestException('Cần invoiceId để hủy hóa đơn');
+    }
+
+    if (args.confirm !== true) {
+      const invoice = await this.invoicesService.findOne(
+        args.invoiceId,
+        user,
+      );
+      return {
+        cancelled: false,
+        invoice,
+        message:
+          'Chưa hủy. Xác nhận lại hóa đơn cần hủy với người dùng, sau đó gọi lại với confirm=true để hủy.',
+      };
+    }
+
+    const invoice = await this.invoicesService.cancel(args.invoiceId, user);
+    return { cancelled: true, invoice };
+  }
+
+  async recordPayment(
+    args: {
+      invoiceId?: string;
+      amount?: number;
+      paymentMethod?: PaymentMethod;
+      notes?: string;
+      confirm?: boolean;
+    },
+    user: User,
+  ) {
+    if (!args.invoiceId || !args.amount || !args.paymentMethod) {
+      throw new BadRequestException(
+        'Cần đủ invoiceId, amount, paymentMethod để ghi nhận thanh toán',
+      );
+    }
+
+    const dto = await this.validateDto(CreatePaymentDto, {
+      invoiceId: args.invoiceId,
+      amount: args.amount,
+      paymentMethod: args.paymentMethod,
+      notes: args.notes,
+    });
+
+    if (args.confirm !== true) {
+      const invoice = await this.invoicesService.findOne(
+        args.invoiceId,
+        user,
+      );
+      return {
+        recorded: false,
+        invoice,
+        preview: dto,
+        message:
+          'Chưa ghi nhận. Xác nhận lại số tiền và hóa đơn với người dùng, sau đó gọi lại với confirm=true để ghi nhận thanh toán.',
+      };
+    }
+
+    const payment = await this.paymentsService.create(dto, user);
+    return { recorded: true, payment };
   }
 
   async getTenantDashboard(user: User) {

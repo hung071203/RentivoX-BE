@@ -126,7 +126,9 @@ export const BASE_TOOLS: GeminiTool_2[] = [
   },
 ];
 
-// Tools chỉ đọc (read-only) dùng chung cho Admin + Super Admin
+// Tools dùng chung cho Admin + Super Admin — chủ yếu chỉ đọc, trừ các hành động ghi có
+// cơ chế preview + confirm=true (broadcastSystemNotification, createLandlordAccount,
+// toggleLandlordActive, resetLandlordPassword)
 export const ADMIN_TOOLS: GeminiTool_2[] = [
   {
     type: 'function',
@@ -230,6 +232,77 @@ export const ADMIN_TOOLS: GeminiTool_2[] = [
       required: ['title', 'message', 'target'],
     },
   },
+  {
+    type: 'function',
+    name: 'createLandlordAccount',
+    description:
+      'Tạo tài khoản chủ trọ mới. Hệ thống tự sinh mật khẩu ngẫu nhiên và gửi qua email, không tự đặt mật khẩu thủ công. LUÔN xác nhận lại đầy đủ thông tin (họ tên, email, số điện thoại) với người dùng trước khi tạo thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        fullName: { type: 'string', description: 'Họ tên chủ trọ' },
+        email: { type: 'string', description: 'Email đăng nhập' },
+        phone: { type: 'string', description: 'Số điện thoại Việt Nam' },
+        dateOfBirth: {
+          type: 'string',
+          description: 'Ngày sinh (YYYY-MM-DD), tùy chọn',
+        },
+        gender: {
+          type: 'string',
+          description: 'Giới tính, tùy chọn',
+          enum: ['male', 'female', 'other'],
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận tạo. Mặc định false/không có = chỉ xem trước, chưa tạo.',
+        },
+      },
+      required: ['fullName', 'email', 'phone'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'toggleLandlordActive',
+    description:
+      'Khóa hoặc mở khóa tài khoản chủ trọ (đảo ngược trạng thái hoạt động hiện tại). LUÔN xác nhận lại với người dùng tài khoản nào và sẽ chuyển sang trạng thái gì trước khi thực hiện thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'ID tài khoản chủ trọ cần khóa/mở khóa',
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa thực hiện.',
+        },
+      },
+      required: ['userId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'resetLandlordPassword',
+    description:
+      'Cấp lại mật khẩu mới cho tài khoản chủ trọ — hệ thống tự sinh mật khẩu ngẫu nhiên và gửi qua email, không trả về mật khẩu qua chat. LUÔN xác nhận lại với người dùng trước khi thực hiện thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        userId: {
+          type: 'string',
+          description: 'ID tài khoản chủ trọ cần cấp lại mật khẩu',
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa thực hiện.',
+        },
+      },
+      required: ['userId'],
+    },
+  },
 ];
 
 const PAGE_PARAMS = {
@@ -240,7 +313,9 @@ const PAGE_PARAMS = {
   },
 };
 
-// Tools chỉ đọc (read-only) dùng cho Landlord — quản lý nhà trọ của chính mình
+// Tools dùng cho Landlord — quản lý nhà trọ của chính mình; chủ yếu chỉ đọc, trừ các
+// hành động ghi có cơ chế preview + confirm=true (createInvoiceForContract,
+// createMeterReading, updateMeterReading, cancelInvoice, recordPayment)
 export const LANDLORD_TOOLS: GeminiTool_2[] = [
   {
     type: 'function',
@@ -444,6 +519,149 @@ export const LANDLORD_TOOLS: GeminiTool_2[] = [
         ...PAGE_PARAMS,
       },
       required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'searchMeterReadings',
+    description:
+      'Tìm kiếm/liệt kê bản ghi chỉ số dịch vụ đo đếm (điện, nước...) theo nhà trọ, phòng, dịch vụ, kỳ. Dùng để biết phòng nào đã ghi/chưa ghi chỉ số trong kỳ, xem chỉ số đầu/cuối, sản lượng tiêu thụ.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string', description: 'Lọc theo id nhà trọ' },
+        roomId: { type: 'string', description: 'Lọc theo id phòng' },
+        serviceId: { type: 'string', description: 'Lọc theo id dịch vụ' },
+        period: {
+          type: 'string',
+          description: 'Lọc theo kỳ, ngày đầu kỳ định dạng YYYY-MM-DD (vd: 2026-06-01)',
+        },
+        ...PAGE_PARAMS,
+      },
+      required: [],
+    },
+  },
+  {
+    type: 'function',
+    name: 'getMeterReadingDetail',
+    description: 'Xem chi tiết 1 bản ghi chỉ số dịch vụ: chỉ số đầu/cuối, sản lượng tiêu thụ, số hợp đồng chia sẻ (phòng ghép), thành tiền.',
+    parameters: {
+      type: 'object',
+      properties: {
+        meterReadingId: { type: 'string', description: 'ID bản ghi chỉ số cần xem' },
+      },
+      required: ['meterReadingId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'createInvoiceForContract',
+    description:
+      'Tạo hóa đơn thủ công cho 1 hợp đồng theo kỳ (tháng). Yêu cầu đã nhập đủ chỉ số cho mọi dịch vụ đo đếm của hợp đồng trong kỳ đó, và kỳ đó chưa có hóa đơn nào (trừ hóa đơn đã hủy). LUÔN xác nhận lại hợp đồng và kỳ với người dùng trước khi tạo thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contractId: { type: 'string', description: 'ID hợp đồng cần tạo hóa đơn' },
+        period: { type: 'string', description: 'Kỳ hóa đơn, định dạng YYYY-MM' },
+        notes: { type: 'string', description: 'Ghi chú, tùy chọn' },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa tạo.',
+        },
+      },
+      required: ['contractId', 'period'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'createMeterReading',
+    description:
+      'Ghi chỉ số dịch vụ đo đếm (điện, nước...) mới cho 1 phòng trong 1 kỳ. Chỉ được ghi cho tháng hiện tại hoặc tháng trước, dịch vụ phải đã gắn vào phòng qua room_services. LUÔN xác nhận lại thông tin với người dùng trước khi ghi thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        roomId: { type: 'string', description: 'ID phòng' },
+        serviceId: { type: 'string', description: 'ID dịch vụ đo đếm' },
+        period: {
+          type: 'string',
+          description: 'Ngày đầu kỳ, định dạng YYYY-MM-DD (vd: 2026-06-01)',
+        },
+        valueStart: { type: 'number', description: 'Chỉ số đầu kỳ' },
+        valueEnd: { type: 'number', description: 'Chỉ số cuối kỳ' },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa ghi.',
+        },
+      },
+      required: ['roomId', 'serviceId', 'period', 'valueStart', 'valueEnd'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'updateMeterReading',
+    description:
+      'Chỉnh sửa chỉ số đầu/cuối kỳ của 1 bản ghi chỉ số dịch vụ đã có. Không thể sửa nếu kỳ đó đã có hóa đơn (chưa hủy). LUÔN xác nhận lại thay đổi với người dùng trước khi lưu thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        meterReadingId: {
+          type: 'string',
+          description: 'ID bản ghi chỉ số cần sửa',
+        },
+        valueStart: { type: 'number', description: 'Chỉ số đầu kỳ mới, tùy chọn' },
+        valueEnd: { type: 'number', description: 'Chỉ số cuối kỳ mới, tùy chọn' },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa lưu.',
+        },
+      },
+      required: ['meterReadingId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'cancelInvoice',
+    description:
+      'Hủy 1 hóa đơn. Chỉ hủy được khi hóa đơn chưa được thanh toán đủ (status khác paid) và chưa có bất kỳ khoản thanh toán nào. LUÔN xác nhận lại hóa đơn cần hủy với người dùng trước khi hủy thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string', description: 'ID hóa đơn cần hủy' },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa hủy.',
+        },
+      },
+      required: ['invoiceId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'recordPayment',
+    description:
+      'Ghi nhận 1 khoản thanh toán cho hóa đơn. Hỗ trợ thanh toán từng phần (partial) — khi tổng các lần thanh toán đạt đủ tổng tiền hóa đơn, hệ thống tự động chuyển hóa đơn sang trạng thái đã thanh toán. Không ghi được cho hóa đơn đã hủy hoặc đã thanh toán đủ. LUÔN xác nhận lại số tiền và hóa đơn với người dùng trước khi ghi thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string', description: 'ID hóa đơn cần ghi nhận thanh toán' },
+        amount: { type: 'integer', description: 'Số tiền thanh toán (VND)' },
+        paymentMethod: {
+          type: 'string',
+          description: 'Phương thức thanh toán',
+          enum: ['cash', 'transfer', 'other'],
+        },
+        notes: { type: 'string', description: 'Ghi chú, tùy chọn' },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa ghi.',
+        },
+      },
+      required: ['invoiceId', 'amount', 'paymentMethod'],
     },
   },
 ];

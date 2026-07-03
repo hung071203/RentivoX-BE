@@ -12,6 +12,7 @@ import { ContractsModule } from '../landlord/contracts/contracts.module';
 import { InvoicesModule } from '../landlord/invoices/invoices.module';
 import { PaymentsModule } from '../landlord/payments/payments.module';
 import { VehiclesModule } from '../landlord/vehicles/vehicles.module';
+import { MeterReadingsModule } from '../landlord/meter-readings/meter-readings.module';
 import { TenantDashboardModule } from '../tenant/dashboard/dashboard.module';
 import { TenantRoomModule } from '../tenant/room/room.module';
 import { TenantContractsModule } from '../tenant/contracts/contracts.module';
@@ -35,6 +36,7 @@ import { ChatController } from './chat.controller';
     InvoicesModule,
     PaymentsModule,
     VehiclesModule,
+    MeterReadingsModule,
     TenantDashboardModule,
     TenantRoomModule,
     TenantContractsModule,
