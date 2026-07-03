@@ -152,6 +152,16 @@ export class ToolAIService {
         return this.getTenantDetail(args.tenantId, user);
       }
 
+      case this.toggleTenantActive.name: {
+        this.assertLandlord(user);
+        return this.toggleTenantActive(args, user);
+      }
+
+      case this.resetTenantPassword.name: {
+        this.assertLandlord(user);
+        return this.resetTenantPassword(args, user);
+      }
+
       case this.searchContracts.name: {
         this.assertLandlord(user);
         return this.searchContracts(args, user);
@@ -577,6 +587,60 @@ export class ToolAIService {
 
   async getTenantDetail(tenantId: string, user: User) {
     return this.tenantsService.findOne(tenantId, user);
+  }
+
+  async toggleTenantActive(
+    args: { tenantId?: string; confirm?: boolean },
+    user: User,
+  ) {
+    if (!args.tenantId) {
+      throw new BadRequestException('Cần tenantId của khách thuê cần khóa/mở khóa');
+    }
+
+    const target = await this.tenantsService.findOne(args.tenantId, user);
+    if (!target.userId) {
+      throw new BadRequestException('Khách thuê chưa có tài khoản');
+    }
+
+    if (args.confirm !== true) {
+      const isActive = (target as any).user?.isActive;
+      return {
+        toggled: false,
+        current: target,
+        willChangeTo: !isActive,
+        message: `Chưa thực hiện. Xác nhận với người dùng muốn ${
+          isActive ? 'khóa' : 'mở khóa'
+        } tài khoản khách thuê "${target.fullName}", sau đó gọi lại với confirm=true.`,
+      };
+    }
+
+    const updated = await this.tenantsService.toggleActive(args.tenantId, user);
+    return { toggled: true, tenant: updated };
+  }
+
+  async resetTenantPassword(
+    args: { tenantId?: string; confirm?: boolean },
+    user: User,
+  ) {
+    if (!args.tenantId) {
+      throw new BadRequestException('Cần tenantId của khách thuê cần cấp lại mật khẩu');
+    }
+
+    const target = await this.tenantsService.findOne(args.tenantId, user);
+    if (!target.userId) {
+      throw new BadRequestException('Khách thuê chưa có tài khoản');
+    }
+
+    if (args.confirm !== true) {
+      return {
+        reset: false,
+        target,
+        message: `Chưa thực hiện. Xác nhận với người dùng muốn cấp lại mật khẩu cho khách thuê "${target.fullName}" (${target.email}) — mật khẩu mới sẽ được gửi tự động qua email, sau đó gọi lại với confirm=true.`,
+      };
+    }
+
+    const updated = await this.tenantsService.resetPassword(args.tenantId, user);
+    return { reset: true, tenant: updated };
   }
 
   async searchContracts(

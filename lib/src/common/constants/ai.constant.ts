@@ -408,6 +408,48 @@ export const LANDLORD_TOOLS: GeminiTool_2[] = [
   },
   {
     type: 'function',
+    name: 'toggleTenantActive',
+    description:
+      'Khóa hoặc mở khóa tài khoản đăng nhập của khách thuê (đảo ngược trạng thái hoạt động hiện tại). Chỉ áp dụng cho khách thuê đã có tài khoản. LUÔN xác nhận lại với người dùng khách thuê nào và sẽ chuyển sang trạng thái gì trước khi thực hiện thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tenantId: {
+          type: 'string',
+          description: 'ID khách thuê cần khóa/mở khóa tài khoản',
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa thực hiện.',
+        },
+      },
+      required: ['tenantId'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'resetTenantPassword',
+    description:
+      'Cấp lại mật khẩu mới cho tài khoản khách thuê — hệ thống tự sinh mật khẩu ngẫu nhiên và gửi qua email, không trả về mật khẩu qua chat. Chỉ áp dụng cho khách thuê đã có tài khoản. LUÔN xác nhận lại với người dùng trước khi thực hiện thật — gọi lần đầu KHÔNG kèm confirm hoặc confirm=false để xem trước, chỉ gọi lại với confirm=true sau khi người dùng đã đồng ý.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tenantId: {
+          type: 'string',
+          description: 'ID khách thuê cần cấp lại mật khẩu',
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Chỉ đặt true sau khi người dùng đã xác nhận. Mặc định false/không có = chỉ xem trước, chưa thực hiện.',
+        },
+      },
+      required: ['tenantId'],
+    },
+  },
+  {
+    type: 'function',
     name: 'searchContracts',
     description:
       'Tìm kiếm/liệt kê hợp đồng theo nhà trọ, phòng, trạng thái. Dùng để biết hợp đồng nào đang hoạt động, sắp hết hạn, đã chấm dứt...',
