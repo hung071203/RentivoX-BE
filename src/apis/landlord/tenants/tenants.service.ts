@@ -159,6 +159,27 @@ export class TenantsService {
     return this.findOne(id, landlord);
   }
 
+  async resetPassword(id: string, landlord: User): Promise<Tenant> {
+    const tenant = await this.findOne(id, landlord);
+    if (!tenant.userId)
+      throw new BadRequestException('Khách thuê chưa có tài khoản');
+
+    const user = await this.userRepo.findOne({ where: { id: tenant.userId } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    const password = AuthUtil.generateRandomPassword();
+    user.passwordHash = await AuthUtil.hashPassword(password);
+    await this.userRepo.save(user);
+
+    this.workersService.sendEmailJob(BullmqEmailJobEnum.SEND_EMAIL, {
+      to: user.email,
+      template: MailTemplates.PASSWORD_RESET,
+      context: { email: user.email, password },
+    });
+
+    return this.findOne(id, landlord);
+  }
+
   async create(
     dto: CreateTenantDto,
     landlord: User,

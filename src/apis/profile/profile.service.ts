@@ -44,6 +44,10 @@ export class ProfileService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        bankBin: true,
+        bankAccountNumber: true,
+        bankAccountHolder: true,
+        bankName: true,
       },
     });
     if (!user) throw new NotFoundException('Người dùng không tồn tại');
@@ -92,6 +96,22 @@ export class ProfileService {
 
     if (user.role === UserRole.TENANT && Object.keys(sharedUpdates).length > 0) {
       await this.tenantRepo.update({ userId }, sharedUpdates);
+    }
+
+    if (user.role === UserRole.LANDLORD) {
+      const bankUpdates = {
+        ...(dto.bankBin !== undefined && { bankBin: dto.bankBin }),
+        ...(dto.bankAccountNumber !== undefined && {
+          bankAccountNumber: dto.bankAccountNumber,
+        }),
+        ...(dto.bankAccountHolder !== undefined && {
+          bankAccountHolder: dto.bankAccountHolder,
+        }),
+        ...(dto.bankName !== undefined && { bankName: dto.bankName }),
+      };
+      if (Object.keys(bankUpdates).length > 0) {
+        await this.userRepo.update(userId, bankUpdates);
+      }
     }
 
     return this.getProfile(userId);

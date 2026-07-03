@@ -1,18 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Invoice } from '@entities/invoice.entity';
+import { PaymentProof } from '@entities/payment-proof.entity';
 import { RoomOccupant } from '@entities/room-occupant.entity';
 import { Tenant } from '@entities/tenant.entity';
 import { User } from '@entities/user.entity';
+import { InvoiceStatus, NotificationType } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
+import { buildVietQrUrl } from '@lib/helpers/vietqr.helper';
+import { UploadsService } from '../../../uploads/uploads.service';
+import { NotificationsService } from '../../../notifications/notifications.service';
 import { GetTenantInvoicesDto } from './dto/get-invoices.dto';
 
 @Injectable()
 export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
   constructor(
     @InjectRepository(Invoice)
     private readonly invoiceRepo: Repository<Invoice>,
+
+    @InjectRepository(PaymentProof)
+    private readonly paymentProofRepo: Repository<PaymentProof>,
 
     @InjectRepository(RoomOccupant)
     private readonly roomOccupantRepo: Repository<RoomOccupant>,
@@ -21,6 +36,8 @@ export class InvoicesService {
     private readonly tenantRepo: Repository<Tenant>,
 
     private readonly dataSource: DataSource,
+    private readonly uploadsService: UploadsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async getTenantId(userId: string): Promise<string> {
@@ -81,7 +98,97 @@ export class InvoicesService {
 
   async findOne(id: string, user: User): Promise<any> {
     const tenantId = await this.getTenantId(user.id);
+    const inv = await this.loadOwnInvoice(id, tenantId);
 
+    const landlordId = inv.contract?.room?.property?.landlordId;
+    const landlord = landlordId
+      ? await this.dataSource.getRepository(User).findOne({
+          where: { id: landlordId },
+          select: {
+            bankBin: true,
+            bankAccountNumber: true,
+            bankAccountHolder: true,
+          },
+        })
+      : null;
+
+    const paymentProofs = await this.paymentProofRepo.find({
+      where: { invoiceId: id },
+      order: { createdAt: 'DESC' },
+    });
+
+    const invoiceExtra = inv as Invoice & {
+      qrCodeUrl: string | null;
+      paymentProofs: PaymentProof[];
+    };
+    invoiceExtra.qrCodeUrl = landlord
+      ? buildVietQrUrl(
+          landlord,
+          Number(inv.totalAmount),
+          inv.invoiceNumber ?? inv.id,
+        )
+      : null;
+    invoiceExtra.paymentProofs = paymentProofs;
+
+    return invoiceExtra;
+  }
+
+  async submitPaymentProof(
+    id: string,
+    user: User,
+    file: Express.Multer.File,
+    note: string | undefined,
+  ): Promise<PaymentProof> {
+    try {
+      const tenantId = await this.getTenantId(user.id);
+      const inv = await this.loadOwnInvoice(id, tenantId);
+
+      if (inv.status !== InvoiceStatus.UNPAID) {
+        throw new BadRequestException(
+          'Chỉ có thể xác nhận chuyển khoản cho hóa đơn chưa thanh toán',
+        );
+      }
+
+      const proof = this.paymentProofRepo.create({
+        invoiceId: id,
+        tenantId,
+        proofImageUrl: this.uploadsService.getFileUrl(
+          'payment-proofs',
+          file.filename,
+        ),
+        note: note ?? null,
+      });
+      const saved = await this.paymentProofRepo.save(proof);
+
+      const landlordId = inv.contract?.room?.property?.landlordId;
+      if (landlordId) {
+        this.notificationsService
+          .create({
+            userId: landlordId,
+            type: NotificationType.PAYMENT_PROOF_SUBMITTED,
+            title: 'Khách thuê xác nhận chuyển khoản',
+            message: `Khách thuê đã gửi ảnh xác nhận chuyển khoản cho hóa đơn ${inv.invoiceNumber ?? ''}.`,
+            data: { invoiceId: inv.id },
+          })
+          .catch((err: Error) =>
+            this.logger.warn(
+              `Không gửi được thông báo xác nhận chuyển khoản: ${err.message}`,
+            ),
+          );
+      }
+
+      return saved;
+    } catch (error) {
+      await this.uploadsService.deleteFile(
+        this.uploadsService.getFileUrl('payment-proofs', file.filename),
+      );
+      throw error;
+    }
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private async loadOwnInvoice(id: string, tenantId: string): Promise<Invoice> {
     const inv = await this.invoiceRepo
       .createQueryBuilder('inv')
       .innerJoin('inv.contract', 'c')
@@ -100,6 +207,7 @@ export class InvoicesService {
         'room.roomNumber',
         'property.id',
         'property.name',
+        'property.landlordId',
         'cs.id',
         'cs.serviceId',
         'svc.id',

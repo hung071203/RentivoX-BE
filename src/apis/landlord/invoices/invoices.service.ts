@@ -11,6 +11,7 @@ import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import { Invoice } from '@entities/invoice.entity';
 import { InvoiceItem } from '@entities/invoice-item.entity';
+import { PaymentProof } from '@entities/payment-proof.entity';
 import { Contract } from '@entities/contract.entity';
 import { ContractService as ContractServiceEntity } from '@entities/contract-service.entity';
 import { MeterReading } from '@entities/meter-reading.entity';
@@ -31,6 +32,7 @@ import { NotificationType } from '@lib/common/enums';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { GetInvoicesDto } from './dto/get-invoices.dto';
 import { generateInvoiceNumber } from '@lib/helpers/app.helper';
+import { buildVietQrUrl } from '@lib/helpers/vietqr.helper';
 
 @Injectable()
 export class InvoicesService {
@@ -42,6 +44,9 @@ export class InvoicesService {
 
     @InjectRepository(InvoiceItem)
     private readonly invoiceItemRepo: Repository<InvoiceItem>,
+
+    @InjectRepository(PaymentProof)
+    private readonly paymentProofRepo: Repository<PaymentProof>,
 
     @InjectRepository(Contract)
     private readonly contractRepo: Repository<Contract>,
@@ -151,7 +156,23 @@ export class InvoicesService {
       .getOne();
 
     (inv.contract as any).owner = ownerOccupant?.tenant ?? null;
-    return inv;
+
+    const paymentProofs = await this.paymentProofRepo.find({
+      where: { invoiceId: id },
+      order: { createdAt: 'DESC' },
+    });
+
+    const invoiceWithQr = inv as Invoice & {
+      qrCodeUrl: string | null;
+      paymentProofs: PaymentProof[];
+    };
+    invoiceWithQr.qrCodeUrl = buildVietQrUrl(
+      landlord,
+      Number(inv.totalAmount),
+      inv.invoiceNumber ?? inv.id,
+    );
+    invoiceWithQr.paymentProofs = paymentProofs;
+    return invoiceWithQr;
   }
 
   async createManual(dto: CreateInvoiceDto, landlord: User): Promise<any> {

@@ -120,6 +120,11 @@ export class TenantsController {
     return this.tenantsService.toggleActive(id, user);
   }
 
+  @Patch(':id/reset-password')
+  resetPassword(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.tenantsService.resetPassword(id, user);
+  }
+
   @Post(':id/id-card/front')
   @UseInterceptors(FileInterceptor('file', multerConfig('id-cards', 'image')))
   uploadIdCardFront(

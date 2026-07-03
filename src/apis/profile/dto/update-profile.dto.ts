@@ -1,4 +1,11 @@
-import { IsDateString, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { IsPhoneNumber } from 'class-validator';
 import { Trim } from '@lib/decorators';
 import { Gender } from '@lib/common/enums';
@@ -22,4 +29,29 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsEnum(Gender, { message: 'Giới tính không hợp lệ' })
   gender?: Gender;
+
+  // Chỉ áp dụng khi role = landlord — dùng để tạo QR chuyển khoản (VietQR) trên hóa đơn
+  @IsOptional()
+  @IsString()
+  @Trim()
+  @MaxLength(20)
+  bankBin?: string;
+
+  @IsOptional()
+  @IsString()
+  @Trim()
+  @MaxLength(30)
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @Trim()
+  @MaxLength(100)
+  bankAccountHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  @Trim()
+  @MaxLength(100)
+  bankName?: string;
 }

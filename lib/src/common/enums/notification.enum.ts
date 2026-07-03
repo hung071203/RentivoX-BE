@@ -7,5 +7,6 @@ export enum NotificationType {
   CONTRACT_TERMINATED = 'contract_terminated',
   AMENDMENT_APPLIED = 'amendment_applied',
   PAYMENT_RECORDED = 'payment_recorded',
+  PAYMENT_PROOF_SUBMITTED = 'payment_proof_submitted',
   SYSTEM_ANNOUNCEMENT = 'system_announcement',
 }

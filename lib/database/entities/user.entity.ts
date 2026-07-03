@@ -27,4 +27,17 @@ export class User extends BaseEntity {
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
+
+  // Chỉ dùng khi role = landlord — dùng để build QR chuyển khoản (VietQR) trên hóa đơn
+  @Column({ name: 'bank_bin', type: 'varchar', nullable: true })
+  bankBin: string | null;
+
+  @Column({ name: 'bank_account_number', type: 'varchar', nullable: true })
+  bankAccountNumber: string | null;
+
+  @Column({ name: 'bank_account_holder', type: 'varchar', nullable: true })
+  bankAccountHolder: string | null;
+
+  @Column({ name: 'bank_name', type: 'varchar', nullable: true })
+  bankName: string | null;
 }

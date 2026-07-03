@@ -28,7 +28,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload) {
     const user = await this.userRepo.findOne({
       where: { id: payload.sub, isActive: true },
-      select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, dateOfBirth: true, gender: true },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        dateOfBirth: true,
+        gender: true,
+        bankBin: true,
+        bankAccountNumber: true,
+        bankAccountHolder: true,
+        bankName: true,
+      },
     });
 
     if (!user) throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã bị khóa');
