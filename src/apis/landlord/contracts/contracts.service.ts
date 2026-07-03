@@ -228,7 +228,7 @@ export class ContractsService {
         throw new NotFoundException(
           `Không tìm thấy khách thuê: ${occ.tenantId}`,
         );
-      await this.assertTenantHasNoActiveContract(occ.tenantId);
+      await this.assertTenantHasNoActiveContractInRoom(occ.tenantId, dto.roomId);
     }
 
     // Phòng phải có ít nhất 1 dịch vụ được gắn (room_services)
@@ -654,7 +654,7 @@ export class ContractsService {
     });
     if (!tenant) throw new NotFoundException('Không tìm thấy khách thuê');
 
-    await this.assertTenantHasNoActiveContract(dto.tenantId);
+    await this.assertTenantHasNoActiveContractInRoom(dto.tenantId, room.id);
 
     const existing = await this.roomOccupantRepo.findOne({
       where: { contractId: id, tenantId: dto.tenantId, movedOutDate: IsNull() },
@@ -814,19 +814,27 @@ export class ContractsService {
     }
   }
 
-  private async assertTenantHasNoActiveContract(tenantId: string): Promise<void> {
+  // Tenant có thể là owner/occupant của nhiều contract ACTIVE cùng lúc (ở các phòng khác nhau),
+  // nhưng KHÔNG được xuất hiện trong 2 contract ACTIVE tại CÙNG 1 phòng.
+  private async assertTenantHasNoActiveContractInRoom(
+    tenantId: string,
+    roomId: string,
+  ): Promise<void> {
     const activeOccupancy = await this.roomOccupantRepo
       .createQueryBuilder('ro')
-      .innerJoin('ro.contract', 'c', 'c.status = :status', {
-        status: ContractStatus.ACTIVE,
-      })
+      .innerJoin(
+        'ro.contract',
+        'c',
+        'c.status = :status AND c.roomId = :roomId',
+        { status: ContractStatus.ACTIVE, roomId },
+      )
       .where('ro.tenantId = :tenantId', { tenantId })
       .andWhere('ro.movedOutDate IS NULL')
       .getOne();
 
     if (activeOccupancy)
       throw new BadRequestException(
-        'Khách thuê đang có hợp đồng hoạt động, không thể thêm vào hợp đồng khác',
+        'Khách thuê đang có hợp đồng hoạt động tại phòng này, không thể thêm vào hợp đồng khác cùng phòng',
       );
   }
 

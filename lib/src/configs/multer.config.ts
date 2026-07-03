@@ -5,7 +5,7 @@ import { extname, join } from 'path';
 import { mkdirSync } from 'fs';
 import { randomUUID } from 'crypto';
 
-export type UploadFolder = 'id-cards' | 'contracts';
+export type UploadFolder = 'id-cards' | 'contracts' | 'vehicles';
 
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_DOC_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
