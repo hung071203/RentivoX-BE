@@ -468,8 +468,8 @@ export class MeterReadingsService {
     const unitPrice = Number(mr.service?.unitPrice ?? 0);
     const contractCount =
       contractCountMap.get(`${mr.roomId}:${mr.serviceId}`) ?? 1;
-    const amountPerContract = consumption * unitPrice;
-    const totalAmount = amountPerContract * contractCount;
+    const totalAmount = consumption * unitPrice;
+    const amountPerContract = Math.round(totalAmount / contractCount);
     return {
       ...mr,
       consumption,

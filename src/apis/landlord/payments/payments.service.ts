@@ -173,13 +173,6 @@ export class PaymentsService {
       throw new BadRequestException('Hóa đơn đã được thanh toán đầy đủ');
     }
 
-    // Tổng đã thanh toán
-    const { paidTotal } = await this.paymentRepo
-      .createQueryBuilder('p')
-      .select('COALESCE(SUM(p.amount), 0)', 'paidTotal')
-      .where('p.invoiceId = :invoiceId', { invoiceId: dto.invoiceId })
-      .getRawOne();
-
     let invoicePaid = false;
     const paymentId = await this.dataSource.transaction(async (manager) => {
       const payment = manager.create(Payment, {
@@ -194,8 +187,15 @@ export class PaymentsService {
       });
       await manager.save(payment);
 
-      const newTotal = Number(paidTotal) + dto.amount;
-      if (newTotal >= Number(inv.totalAmount)) {
+      // Tổng đã thanh toán — đọc lại trong transaction (sau khi đã lưu payment mới)
+      // để thu hẹp cửa sổ race so với đọc ngoài transaction trước đây
+      const { paidTotal } = await manager
+        .createQueryBuilder(Payment, 'p')
+        .select('COALESCE(SUM(p.amount), 0)', 'paidTotal')
+        .where('p.invoiceId = :invoiceId', { invoiceId: dto.invoiceId })
+        .getRawOne();
+
+      if (Number(paidTotal) >= Number(inv.totalAmount)) {
         await manager.update(Invoice, inv.id, {
           status: InvoiceStatus.PAID,
           paidAt: new Date(),
