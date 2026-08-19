@@ -5,11 +5,9 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
-  Validate,
 } from 'class-validator';
 import { Gender, UserRole } from '@lib/common/enums';
-import { ToLowerCase, Trim } from '@lib/decorators';
-import { MinAge18Constraint } from './validators';
+import { MinAge16, ToLowerCase, Trim } from '@lib/decorators';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
@@ -30,7 +28,7 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
-  @Validate(MinAge18Constraint)
+  @MinAge16()
   dateOfBirth?: string;
 
   @IsOptional()

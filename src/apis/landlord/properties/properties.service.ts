@@ -82,13 +82,15 @@ export class PropertiesService {
     dto: UpdatePropertyDto,
     landlord: User,
   ): Promise<Property> {
-    const existingProperty = await this.propertyRepo.findOne({
-      where: { name: dto.name, landlordId: landlord.id, id: Not(id) },
-    });
-    if (existingProperty) {
-      throw new BadRequestException(
-        'Nhà trọ với tên này đã tồn tại. Vui lòng chọn tên khác.',
-      );
+    if (dto.name) {
+      const existingProperty = await this.propertyRepo.findOne({
+        where: { name: dto.name, landlordId: landlord.id, id: Not(id) },
+      });
+      if (existingProperty) {
+        throw new BadRequestException(
+          'Nhà trọ với tên này đã tồn tại. Vui lòng chọn tên khác.',
+        );
+      }
     }
 
     const property = await this.findOne(id, landlord);

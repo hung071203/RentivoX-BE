@@ -88,14 +88,16 @@ export class AuthService {
     });
     if (!user) throw new NotFoundException('Tài khoản không tồn tại.');
 
-    await this.otpService.verify(OtpContext.FORGOT_PASSWORD, user.id, dto.otp);
-
+    // Check trước khi verify OTP (OTP dùng 1 lần, bị xoá ngay khi verify đúng) —
+    // tránh lãng phí OTP hợp lệ chỉ vì người dùng lỡ chọn lại mật khẩu cũ
     const isSame = await AuthUtil.comparePassword(
       dto.newPassword,
       user.passwordHash,
     );
     if (isSame)
       throw new BadRequestException('Mật khẩu mới phải khác mật khẩu cũ.');
+
+    await this.otpService.verify(OtpContext.FORGOT_PASSWORD, user.id, dto.otp);
 
     const hash = await AuthUtil.hashPassword(dto.newPassword);
     await this.userRepo.update(user.id, { passwordHash: hash });

@@ -165,6 +165,24 @@ export class ContractsService {
     landlord: User,
     file: Express.Multer.File,
   ): Promise<Contract> {
+    try {
+      return await this.createContractWithFile(dto, landlord, file);
+    } catch (error) {
+      // File hợp đồng đã được multer lưu vào đĩa TRƯỚC khi validate/transaction
+      // chạy — nếu bất kỳ bước nào sau đó throw, phải xóa file vừa upload,
+      // tránh rác file mồ côi trên đĩa
+      await this.uploadsService.deleteFile(
+        this.uploadsService.getFileUrl('contracts', file.filename),
+      );
+      throw error;
+    }
+  }
+
+  private async createContractWithFile(
+    dto: CreateContractDto,
+    landlord: User,
+    file: Express.Multer.File,
+  ): Promise<Contract> {
     // --- Validation (reads only, outside transaction) ---
     const room = await this.roomRepo.findOne({
       where: { id: dto.roomId },
@@ -318,7 +336,19 @@ export class ContractsService {
         'Hợp đồng đang có phụ lục chưa được áp dụng. Vui lòng chờ phụ lục hiện tại có hiệu lực trước khi tạo mới.',
       );
 
+    if (dto.amendmentType === AmendmentType.RENEWAL) {
+      if (!dto.newEndDate)
+        throw new BadRequestException(
+          'Phụ lục gia hạn phải có ngày kết thúc mới (newEndDate)',
+        );
+      if (new Date(dto.newEndDate) <= new Date(contract.endDate))
+        throw new BadRequestException(
+          'Ngày kết thúc mới phải lớn hơn ngày kết thúc hiện tại của hợp đồng',
+        );
+    }
+
     const room = contract.room as Room;
+    const roomServicePriceByServiceId = new Map<string, number>();
     if (dto.serviceChanges?.length) {
       for (const change of dto.serviceChanges) {
         if (!change.contractServiceId && !change.serviceId)
@@ -326,6 +356,10 @@ export class ContractsService {
             'Mỗi dịch vụ phải có contractServiceId hoặc serviceId',
           );
         if (change.contractServiceId) {
+          if (change.newUnitPrice == null)
+            throw new BadRequestException(
+              'newUnitPrice bắt buộc khi cập nhật giá dịch vụ đã có trong hợp đồng',
+            );
           const cs = await this.contractServiceRepo.findOne({
             where: { id: change.contractServiceId, contractId: id },
           });
@@ -350,6 +384,12 @@ export class ContractsService {
             throw new BadRequestException(
               `Dịch vụ "${roomService.service.name}" đã có trong hợp đồng`,
             );
+          // Không bắt buộc newUnitPrice khi thêm dịch vụ mới — mặc định lấy giá
+          // đang áp dụng cho phòng (room_services), landlord có thể override nếu muốn
+          roomServicePriceByServiceId.set(
+            change.serviceId,
+            Number(roomService.unitPrice),
+          );
         }
       }
     }
@@ -411,7 +451,9 @@ export class ContractsService {
             const newCs = manager.create(ContractServiceEntity, {
               contractId: id,
               serviceId: change.serviceId,
-              unitPrice: change.newUnitPrice,
+              unitPrice:
+                change.newUnitPrice ??
+                roomServicePriceByServiceId.get(change.serviceId),
             });
             await manager.save(ContractServiceEntity, newCs);
           } else if (change.contractServiceId) {

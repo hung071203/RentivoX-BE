@@ -7,7 +7,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { IsPhoneNumber } from 'class-validator';
-import { Trim } from '@lib/decorators';
+import { MinAge16, Trim } from '@lib/decorators';
 import { Gender } from '@lib/common/enums';
 
 export class UpdateProfileDto {
@@ -24,6 +24,7 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ (định dạng: YYYY-MM-DD)' })
+  @MinAge16()
   dateOfBirth?: string;
 
   @IsOptional()

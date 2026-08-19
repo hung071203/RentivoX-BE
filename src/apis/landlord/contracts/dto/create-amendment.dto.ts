@@ -22,9 +22,14 @@ export class AmendmentServiceChangeInput {
   @IsUUID()
   serviceId?: string;
 
+  // Bắt buộc khi dùng contractServiceId (cập nhật giá dịch vụ đã có).
+  // Khi dùng serviceId (thêm dịch vụ mới), có thể bỏ trống — hệ thống lấy
+  // giá từ room_services của phòng; vẫn có thể truyền để override giá đó.
+  @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
-  newUnitPrice: number;
+  newUnitPrice?: number;
 }
 
 export class OccupantAddInput {

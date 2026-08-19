@@ -121,13 +121,16 @@ export class InvoicesService {
       qrCodeUrl: string | null;
       paymentProofs: PaymentProof[];
     };
-    invoiceExtra.qrCodeUrl = landlord
-      ? buildVietQrUrl(
-          landlord,
-          Number(inv.totalAmount),
-          inv.invoiceNumber ?? inv.id,
-        )
-      : null;
+    // Chỉ trả QR khi hóa đơn còn cần thanh toán — invoice đã paid/cancelled
+    // không còn ý nghĩa để quét chuyển khoản
+    invoiceExtra.qrCodeUrl =
+      landlord && inv.status === InvoiceStatus.UNPAID
+        ? buildVietQrUrl(
+            landlord,
+            Number(inv.totalAmount),
+            inv.invoiceNumber ?? inv.id,
+          )
+        : null;
     invoiceExtra.paymentProofs = paymentProofs;
 
     return invoiceExtra;

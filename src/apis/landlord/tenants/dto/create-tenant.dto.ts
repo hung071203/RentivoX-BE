@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Gender } from '@lib/common/enums';
-import { ToLowerCase, Trim } from '@lib/decorators';
+import { MinAge16, ToLowerCase, Trim } from '@lib/decorators';
 
 export class CreateTenantDto {
   @IsString()
@@ -42,6 +42,7 @@ export class CreateTenantDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+  @MinAge16()
   dateOfBirth?: string;
 
   @IsOptional()

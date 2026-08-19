@@ -175,6 +175,17 @@ export class PaymentsService {
 
     let invoicePaid = false;
     const paymentId = await this.dataSource.transaction(async (manager) => {
+      // Khóa dòng invoice (SELECT ... FOR UPDATE) để tuần tự hóa các request ghi
+      // nhận thanh toán đồng thời cho CÙNG 1 invoice — nếu không, dưới
+      // REPEATABLE READ mỗi transaction chỉ thấy SUM() theo snapshot riêng của
+      // nó và có thể lost-update (2 payment cộng đủ tiền nhưng invoice kẹt unpaid)
+      const lockedInv = await manager
+        .createQueryBuilder(Invoice, 'inv')
+        .setLock('pessimistic_write')
+        .where('inv.id = :id', { id: dto.invoiceId })
+        .getOne();
+      if (!lockedInv) throw new NotFoundException('Không tìm thấy hóa đơn');
+
       const payment = manager.create(Payment, {
         invoiceId: dto.invoiceId,
         amount: dto.amount,
@@ -187,16 +198,19 @@ export class PaymentsService {
       });
       await manager.save(payment);
 
-      // Tổng đã thanh toán — đọc lại trong transaction (sau khi đã lưu payment mới)
-      // để thu hẹp cửa sổ race so với đọc ngoài transaction trước đây
+      // An toàn nhờ lock ở trên: transaction thứ 2 chỉ chạy đến đây sau khi
+      // transaction thứ 1 đã commit, nên SELECT FOR UPDATE đọc được bản mới nhất
       const { paidTotal } = await manager
         .createQueryBuilder(Payment, 'p')
         .select('COALESCE(SUM(p.amount), 0)', 'paidTotal')
         .where('p.invoiceId = :invoiceId', { invoiceId: dto.invoiceId })
         .getRawOne();
 
-      if (Number(paidTotal) >= Number(inv.totalAmount)) {
-        await manager.update(Invoice, inv.id, {
+      if (
+        lockedInv.status !== InvoiceStatus.CANCELLED &&
+        Number(paidTotal) >= Number(lockedInv.totalAmount)
+      ) {
+        await manager.update(Invoice, dto.invoiceId, {
           status: InvoiceStatus.PAID,
           paidAt: new Date(),
         });

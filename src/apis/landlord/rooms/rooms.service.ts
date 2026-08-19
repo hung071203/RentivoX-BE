@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Room } from '@entities/room.entity';
 import { Property } from '@entities/property.entity';
 import { Contract } from '@entities/contract.entity';
+import { RoomService as RoomServiceEntity } from '@entities/room-service.entity';
 import { User } from '@entities/user.entity';
 import { ContractStatus, RoomStatus } from '@lib/common/enums';
 import { OrderDirection, PaginatedResult } from '@lib/common/dto';
@@ -28,6 +29,9 @@ export class RoomsService {
 
     @InjectRepository(Contract)
     private readonly contractRepo: Repository<Contract>,
+
+    @InjectRepository(RoomServiceEntity)
+    private readonly roomServiceRepo: Repository<RoomServiceEntity>,
   ) {}
 
   async findAll(dto: GetRoomsDto, landlord: User): Promise<PaginatedResult<Room>> {
@@ -183,6 +187,27 @@ export class RoomsService {
     if (activeContracts > 0) {
       throw new BadRequestException(
         'Không thể xóa phòng đang có hợp đồng còn hiệu lực',
+      );
+    }
+
+    // Phòng có bất kỳ hợp đồng nào (kể cả đã terminated/expired) hoặc còn
+    // room_services đều có FK tham chiếu tới phòng — xóa thẳng sẽ crash 500
+    // do vi phạm foreign key constraint ở tầng DB. Chặn sớm với thông báo rõ.
+    const anyContracts = await this.contractRepo.count({
+      where: { roomId: room.id },
+    });
+    if (anyContracts > 0) {
+      throw new BadRequestException(
+        'Không thể xóa phòng đã từng có hợp đồng (kể cả đã kết thúc) — dữ liệu này cần giữ lại cho lịch sử',
+      );
+    }
+
+    const roomServiceCount = await this.roomServiceRepo.count({
+      where: { roomId: room.id },
+    });
+    if (roomServiceCount > 0) {
+      throw new BadRequestException(
+        'Không thể xóa phòng còn dịch vụ gắn kèm — hãy gỡ hết dịch vụ khỏi phòng trước',
       );
     }
 
